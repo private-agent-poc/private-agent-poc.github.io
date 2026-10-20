@@ -38,6 +38,7 @@ const LOGIN_ENVS = ["DSTACK_AUTHORIZED_KEYS", "DSTACK_ROOT_PASSWORD", "DSTACK_RO
 const TCB_PASS = new Set(["UpToDate", "SWHardeningNeeded"]);
 const TCB_WARN = new Set(["ConfigurationNeeded", "ConfigurationAndSWHardeningNeeded", "OutOfDate", "OutOfDateConfigurationNeeded"]);
 const HEX64 = /^[0-9a-f]{64}$/;
+export const GATEWAY_HOST = "inference.phala.com";
 const COLLATERAL_TTL_MS = 10 * 60 * 1000;
 
 const enc = new TextEncoder();
@@ -223,6 +224,8 @@ class Result {
     this.collateral = null;
     this.measurements = {};
     this.trace = {};
+    this.api_version = null;
+    this.app_compose = null;
   }
   add(name, status, detail = "") { this.checks.push({ name, status, detail }); }
   get failed() { return this.checks.filter((c) => c.status === "FAIL"); }
@@ -256,6 +259,7 @@ export async function verifyReport(report, nonceHex, opts = {}) {
   } = opts;
   const now = Math.floor(opts.now ?? Date.now() / 1000);
   const r = new Result();
+  r.api_version = report.api_version ?? null;
   const p = label || "";
   const att = report.attestation || {};
   const ev = att.evidence || {};
@@ -380,11 +384,13 @@ export async function verifyReport(report, nonceHex, opts = {}) {
     } else r.add(`${p}镜像按 digest 固定`, "PASS", images.join("；"));
     const allowed = new Set(appCompose.allowed_envs || []);
     const risky = LOGIN_ENVS.filter((e) => allowed.has(e)).sort();
-    if (!risky.length) r.add(`${p}无法用 SSH 公钥 / root 密码登录`, "PASS", "allowed_envs 不含登录凭据变量");
-    else if (image) {
-      r.add(`${p}无法用 SSH 公钥 / root 密码登录`, "PASS", `allowed_envs 含 ${risky.join(", ")}，但 ${image} 正式镜像没有 sshd 和 login`);
+    if (image) {
+      r.add(`${p}无法用 SSH 公钥 / root 密码登录`, "PASS", `${image} 正式镜像里没有 SSH 服务和登录程序；` +
+        (risky.length ? `allowed_envs 含 ${risky.join(", ")}，在正式镜像里无效` : "allowed_envs 不含 root 密码和 SSH 公钥变量"));
+    } else if (risky.length) {
+      r.add(`${p}无法用 SSH 公钥 / root 密码登录`, "FAIL", `系统镜像不是已知正式版，且 allowed_envs 含 ${risky.join(", ")}`);
     } else {
-      r.add(`${p}无法用 SSH 公钥 / root 密码登录`, "FAIL", `allowed_envs 含 ${risky.join(", ")}，且系统镜像不是已知正式版`);
+      r.add(`${p}无法用 SSH 公钥 / root 密码登录`, "WARN", "系统镜像不是已知正式版，无法确认镜像里没有 SSH 服务；宿主机还能通过 user_config 写入 SSH 公钥");
     }
     if (expectImage) {
       const want = expectImage.split("@").pop();
@@ -409,6 +415,7 @@ export async function verifyReport(report, nonceHex, opts = {}) {
     if (appCompose.pre_launch_script) settings.pre_launch_script = "有（已被 compose-hash 覆盖）";
     r.measurements.app_compose_settings = settings;
     r.trace.app_compose = appCompose;
+    r.app_compose = appCompose;
     r.trace.images = images;
     r.trace.login_envs = { allowed_envs: appCompose.allowed_envs || [], risky, watched: LOGIN_ENVS };
   }
@@ -448,8 +455,11 @@ export function receiptHash(event) {
   return event.body_hash || event.wire_hash || null;
 }
 
-export async function verifyReceiptSignature(receipt, keyset) {
+export async function verifyReceiptSignature(receipt, keyset, apiVersion = null) {
   const name = "回执签名（公钥来自已验证的证明）";
+  if (apiVersion !== null && receipt.api_version !== apiVersion) {
+    return { name, status: "FAIL", detail: `回执 api_version ${receipt.api_version ?? "None"}，应为 ${apiVersion}` };
+  }
   const keys = keyset.receipt_signing_keys || [];
   let key = keys.find((k) => k.key_id === receipt.key_id) || null;
   if (key === null && keys.length === 1 && !("key_id" in receipt)) key = keys[0];
@@ -464,7 +474,8 @@ export async function verifyReceiptSignature(receipt, keyset) {
   try {
     const pub = await subtle.importKey("raw", hexToBytes(key.public_key), { name: "Ed25519" }, false, ["verify"]);
     const ok = await subtle.verify({ name: "Ed25519" }, pub, hexToBytes(receipt.signature || ""), payload);
-    return ok ? { name, status: "PASS", detail: `Ed25519，key_id ${key.key_id}` } : { name, status: "FAIL", detail: "签名无效 " };
+    return ok ? { name, status: "PASS", detail: `Ed25519，key_id ${key.key_id}` + (apiVersion !== null ? `，api_version ${apiVersion}` : "") }
+      : { name, status: "FAIL", detail: "签名无效 " };
   } catch (e) {
     return { name, status: "FAIL", detail: `签名无效 ${errText(e)}` };
   }
@@ -610,7 +621,7 @@ export async function chat(base, res, inner, token) {
                 detail: `X25519 + AES-256-GCM，公钥 ${key.public_key}` });
   const out = JSON.parse(respText);
   const receipt = resp.receipt || {};
-  checks.push(await verifyReceiptSignature(receipt, res.keyset));
+  checks.push(await verifyReceiptSignature(receipt, res.keyset, res.api_version));
   checks.push(eqCheck("CVM 回执：公钥集摘要一致", receipt.workload_keyset_digest, res.keyset_digest));
   checks.push(eqCheck("CVM 回执：请求哈希 = 我发出的内容", receiptHash(receiptEvent(receipt, "request.received")), await sha256Tag(reqPlain)));
   checks.push(eqCheck("CVM 回执：回复哈希 = 我收到的内容", receiptHash(receiptEvent(receipt, "response.returned")), await sha256Tag(respPlain)));
@@ -637,8 +648,7 @@ export async function verifyGateway(out, args) {
     const prov = (gw.attestation || {}).source_provenance || {};
     if (Object.keys(prov).length) {
       gres.provenance = prov;
-      checks.push({ name: "网关 · 源码出处（未被 quote 直接绑定，仅展示）", status: "INFO",
-                    detail: `${prov.repo_url ?? "None"} @ ${prov.repo_commit ?? "None"}` });
+      checks.push(provenanceCheck(prov, gres.app_compose));
     }
   }
   const st = out.upstream_status;
@@ -663,24 +673,54 @@ export async function verifyGateway(out, args) {
     checks.push({ name: "网关回执", status: "FAIL", detail: "网关证明未通过，回执无从核对" });
     return { checks, report: gres, trace };
   }
-  checks.push(await verifyReceiptSignature(receipt, gres.keyset));
+  checks.push(await verifyReceiptSignature(receipt, gres.keyset, gres.api_version || "aci/1"));
   checks.push(eqCheck("网关回执：公钥集摘要 = 刚验证过的网关", receipt.workload_keyset_digest, gres.keyset_digest));
   if (gw.workload_id && receipt.workload_id) checks.push(eqCheck("网关回执：workload_id 一致", receipt.workload_id, gw.workload_id));
   checks.push(eqCheck("网关回执：请求哈希 = CVM 实际发出的字节", receiptHash(receiptEvent(receipt, "request.received")), await sha256Tag(reqBytes)));
   checks.push(eqCheck("网关回执：回复哈希 = CVM 实际收到的字节", receiptHash(receiptEvent(receipt, "response.returned")), await sha256Tag(respBytes)));
   const up = receiptEvent(receipt, "upstream.verified") || {};
+  const route = (receiptEvent(receipt, "route.selected") || {}).target_route_id;
   const good = up.result === "verified" && up.required === true && Boolean(up.session_id);
-  checks.push({ name: "网关回执：上游 GPU TEE 已验证（upstream.verified）", status: good ? "PASS" : "FAIL",
+  checks.push({ name: "网关回执：上游 TEE 已验证（网关声明，upstream.verified）", status: good ? "PASS" : "FAIL",
                 detail: `result=${up.result ?? "None"} required=${up.required === undefined ? "None" : up.required ? "True" : "False"} ` +
-                        `model=${up.model_id ?? "None"} session=${up.session_id ?? "None"}` });
-  const tls = (gres.keyset.tls_public_keys || []).map((k) => k.spki_sha256);
-  const spki = out.observed_tls_spki_sha256;
-  if (!tls.length) {
-    checks.push({ name: "CVM→网关 TLS 公钥在证明里", status: "WARN", detail: "网关证明没列出 TLS 公钥，这一段只能依赖普通 HTTPS 证书" });
-  } else {
-    checks.push({ name: "CVM→网关 TLS 公钥在证明里", status: tls.includes(spki) ? "PASS" : "FAIL", detail: `观察到 ${spki}` });
-  }
+                        `model=${up.model_id ?? "None"} route=${route ?? "None"} session=${up.session_id ?? "None"}` });
+  checks.push(tlsCheck(gres.keyset.tls_public_keys || [], out.observed_tls_spki_sha256, args.gatewayHost || GATEWAY_HOST));
   return { checks, report: gres, trace };
+}
+
+export function hostMatches(domain, host) {
+  const d = String(domain || "").toLowerCase().replace(/\.$/, "");
+  const h = String(host || "").toLowerCase();
+  if (d.startsWith("*.")) return h.endsWith(d.slice(1)) && !h.slice(0, -d.length + 1).includes(".");
+  return d === h;
+}
+
+export function tlsCheck(entries, spki, host) {
+  const name = "CVM→网关 TLS 公钥在证明里";
+  if (!entries.length) return { name, status: "WARN", detail: "网关证明没列出 TLS 公钥，这一段只能依赖普通 HTTPS 证书" };
+  const scoped = entries.some((k) => k.domain);
+  const mine = scoped ? entries.filter((k) => hostMatches(k.domain, host)) : entries;
+  if (!mine.length) return { name, status: "FAIL", detail: `网关证明里没有 ${host} 的 TLS 公钥` };
+  const ok = mine.some((k) => k.spki_sha256 === spki);
+  return { name, status: ok ? "PASS" : "FAIL", detail: `${scoped ? host : "任一条目"}：观察到 ${spki ?? "None"}` };
+}
+
+export function composeRepoCommits(appCompose) {
+  const text = (appCompose && appCompose.docker_compose_file) || "";
+  const found = Array.from(text.matchAll(/PRIVATE_AI_GATEWAY_REPO_COMMIT\s*[=:]\s*["']?([0-9a-fA-F]{40})\b/g), (m) => m[1].toLowerCase());
+  return [...new Set(found)];
+}
+
+export function provenanceCheck(prov, appCompose) {
+  const name = "网关 · 源码出处（与度量配置中的 REPO_COMMIT 比对）";
+  const claimed = String(prov.repo_commit ?? "").toLowerCase();
+  const head = `${prov.repo_url ?? "None"} @ ${prov.repo_commit ?? "None"}`;
+  const measured = composeRepoCommits(appCompose);
+  if (!measured.length) return { name, status: "WARN", detail: `${head}；度量配置里没有 PRIVATE_AI_GATEWAY_REPO_COMMIT，无法佐证` };
+  if (measured.length === 1 && measured[0] === claimed) {
+    return { name, status: "INFO", detail: `${head}；与度量配置里的 PRIVATE_AI_GATEWAY_REPO_COMMIT 一致` };
+  }
+  return { name, status: "WARN", detail: `${head}；度量配置里是 ${measured.join(", ")}` };
 }
 
 export async function tamperDemo(report, nonce, res, args) {

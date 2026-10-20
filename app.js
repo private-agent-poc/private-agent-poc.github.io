@@ -46,7 +46,7 @@ const LABELS = {
   "CVM 回执：公钥集摘要一致": "回执 · 公钥集摘要",
   "CVM 回执：请求哈希 = 我发出的内容": "回执 · 请求哈希",
   "CVM 回执：回复哈希 = 我收到的内容": "回执 · 响应哈希",
-  "源码出处（未被 quote 直接绑定，仅展示）": "源码出处",
+  "源码出处（与度量配置中的 REPO_COMMIT 比对）": "源码出处",
   "推理调用": "推理调用",
   "网关证明": "网关证明",
   "推理请求经网关返回": "推理请求",
@@ -56,7 +56,7 @@ const LABELS = {
   "网关回执：workload_id 一致": "网关回执 · workload_id",
   "网关回执：请求哈希 = CVM 实际发出的字节": "网关回执 · 请求哈希",
   "网关回执：回复哈希 = CVM 实际收到的字节": "网关回执 · 响应哈希",
-  "网关回执：上游 GPU TEE 已验证（upstream.verified）": "上游 GPU TEE",
+  "网关回执：上游 TEE 已验证（网关声明，upstream.verified）": "上游 TEE（网关声明）",
   "CVM→网关 TLS 公钥在证明里": "TLS 公钥绑定",
   "把部署配置改一个字（换镜像）": "篡改 compose",
   "拿旧证明冒充（换一个 nonce 验证）": "重放旧证明",
@@ -374,7 +374,7 @@ function renderFlow(rec) {
   const up = (rec.sections.gateway || []).find((c) => c.name.includes("upstream.verified"));
   const model = rec.kind === "login" ? "skipped" : up ? (up.status === "PASS" ? "pass" : "fail")
     : gw === "skipped" ? "skipped" : gw === "running" ? "running" : "idle";
-  const nodes = [["客户端", "LOCAL", "pass local"], ["CVM", "INTEL TDX", cvm], ["推理网关", "INTEL TDX", gw], ["模型", "GPU TEE", model]];
+  const nodes = [["客户端", "LOCAL", "pass local"], ["CVM", "INTEL TDX", cvm], ["推理网关", "INTEL TDX", gw], ["上游模型", "TEE · 网关声明", model]];
   const links = [cvm, gw, model];
   nodes.forEach(([name, tag, s], i) => {
     const n = el("div", "node " + s);
@@ -450,7 +450,7 @@ const RUNTIME_EVENTS = {
   "app-id": "应用 ID，部署时确定，KMS 按它派发密钥",
   "compose-hash": "部署配置 app_compose 的 sha256",
   "init-script-hash": "初始化脚本的 sha256",
-  "gpu-policy-hash": "app_compose 里 GPU 策略的哈希",
+  "gpu-policy-hash": "app_compose 里 requirements.gpu_policy 的哈希，未设置时为 sha256(\"{}\")",
   "gpu-attestation": "GPU TEE 证明结果",
   "instance-id": "实例 ID，由实例种子和 app_id 哈希得到",
   "boot-mr-done": "启动度量结束，接着向 KMS 取密钥",
@@ -459,7 +459,7 @@ const RUNTIME_EVENTS = {
   "key-provider": "密钥提供方：KMS 及其公钥",
   "storage-fs": "数据盘文件系统",
   "storage-encrypted": "数据盘加密，1 为加密",
-  "system-ready": "数据盘就绪，开始启动容器",
+  "system-ready": "数据盘已挂载，系统准备阶段结束，之后才启动容器",
 };
 const HASH_EVENTS = new Set(["app-id", "compose-hash", "init-script-hash", "gpu-policy-hash", "gpu-attestation",
                              "instance-id", "mr-kms", "os-image-hash"]);
@@ -471,7 +471,7 @@ const BOOT_EVENTS = {
   0x80000002: ["EV_EFI_VARIABLE_BOOT", "启动项变量"],
   0x80000003: ["EV_EFI_BOOT_SERVICES_APPLICATION", "加载内核"],
   0x80000007: ["EV_EFI_ACTION", "固件动作"],
-  0x8000000a: ["EV_EFI_PLATFORM_FIRMWARE_BLOB2", "固件代码卷"],
+  0x8000000a: ["EV_EFI_PLATFORM_FIRMWARE_BLOB2", "TDVF 配置固件卷 CFV，UEFI 变量存储初值"],
   0x8000000b: ["EV_EFI_HANDOFF_TABLES2", "固件移交表"],
 };
 const TD_FIELDS = [
@@ -497,7 +497,7 @@ const RECEIPT_EVENTS = {
   "middleware.forwarded": "中间件处理后的请求体",
   "route.selected": "选定的上游路由",
   "request.forwarded": "转发给上游的请求体",
-  "upstream.verified": "上游 GPU TEE 证明核验",
+  "upstream.verified": "网关对上游 TEE 的验证结果，网关签名声明；是否有 GPU 证明取决于当次路由到哪家",
   "response.received": "上游返回的响应体",
   "response.returned": "返回给调用方的响应体",
 };
@@ -852,7 +852,13 @@ const EVIDENCE = {
     return [receiptHashCompare(ch.receipt, "response.returned", "sha256 · 解密后的回复", ch.response.sha256),
             fold(`回复明文 · ${ch.response.size} B`, jsonView(ch.response.plain))];
   },
-  "源码出处（未被 quote 直接绑定，仅展示）": ({ r }) => (r.provenance ? code(pretty(r.provenance)) : null),
+  "源码出处（与度量配置中的 REPO_COMMIT 比对）": ({ r }) => {
+    if (!r.provenance) return null;
+    const measured = V.composeRepoCommits(r.app_compose);
+    return [compare([["source_provenance.repo_commit", String(r.provenance.repo_commit ?? "").toLowerCase() || null],
+                     ["PRIVATE_AI_GATEWAY_REPO_COMMIT", measured.join(", ") || null, "度量配置 docker_compose_file"]]),
+            fold("source_provenance", code(pretty(r.provenance)))];
+  },
   "推理请求经网关返回": ({ g }) => (g ? kv([
     ["请求", `POST ${GATEWAY_URL}/v1/chat/completions`], ["HTTP", g.status], ["模型", g.model],
     ["x-receipt-id", g.receipt_id], ["请求体", `${g.request.size} B`], ["响应体", `${g.response.size} B`],
@@ -877,10 +883,13 @@ const EVIDENCE = {
     receiptHashCompare(g.receipt, "response.returned", "sha256 · CVM 收到的字节", g.response.sha256),
     fold(`响应体 · ${g.response.size} B`, code(prettyText(g.response.text))),
   ] : null),
-  "网关回执：上游 GPU TEE 已验证（upstream.verified）": ({ g }) => {
+  "网关回执：上游 TEE 已验证（网关声明，upstream.verified）": ({ g }) => {
     if (!g || !g.receipt) return null;
     const up = V.receiptEvent(g.receipt, "upstream.verified");
-    return [up ? kv(Object.entries(up).map(([k, v]) => [k, typeof v === "string" ? v : JSON.stringify(v)])) : null,
+    const route = V.receiptEvent(g.receipt, "route.selected");
+    return [kv([["性质", "网关签名的声明；是否有 GPU 证明取决于当次路由到哪家上游，详情在会话 session_id 里"],
+                ["上游路由", route ? route.target_route_id : undefined]]),
+            up ? kv(Object.entries(up).map(([k, v]) => [k, typeof v === "string" ? v : JSON.stringify(v)])) : null,
             fold(`回执事件 · ${(g.receipt.event_log || []).length}`, receiptCards(g.receipt))];
   },
   "CVM→网关 TLS 公钥在证明里": ({ t, g }) => {
@@ -891,7 +900,7 @@ const EVIDENCE = {
     nodes.push(kv(keys.map((k, i) => {
       const box = el("div");
       box.append(el("div", null, k.spki_sha256));
-      if (k.spki_sha256 === g.spki) box.append(mark(true, "= 观察到"));
+      if (V.hostMatches(k.domain, V.GATEWAY_HOST)) box.append(mark(k.spki_sha256 === g.spki, k.spki_sha256 === g.spki ? "= 观察到" : "≠ 观察到"));
       return [k.domain || `tls ${i + 1}`, box, "tls_public_keys"];
     })));
     if (ev) nodes.push(fold("downstream_tls_binding", code(pretty(ev))));
