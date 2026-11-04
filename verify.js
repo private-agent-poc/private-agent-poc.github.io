@@ -1413,9 +1413,12 @@ export async function* runAgent(base, args) {
     const p = args.provider;
     const label = { phala: "网关 · ", chutes: "Chutes · ", near: "NEAR · " }[p];
     const checks = [];
-    const ev = upstream && upstream.evidence ? upstream.evidence[p] : null;
+    const stopped = Boolean(upstream && upstream.stopped);
+    const found = upstream && upstream.evidence ? upstream.evidence[p] : null;
+    const ev = stopped && found && found.error ? null : found;
     const calls = (upstream && upstream.calls) || [];
-    if (!ev) checks.push({ name: `${label}模型机验证`, status: "FAIL", detail: "本轮没有成功的模型调用" });
+    if (!ev) checks.push({ name: `${label}模型机验证`, status: stopped ? "INFO" : "FAIL",
+                           detail: stopped ? "这一轮已停止，没有完成的模型调用" : "本轮没有成功的模型调用" });
     else {
       const out = { ...ev, _gateway_nonce: turnNonce, _messages: null };
       const vargs = { ...args, agent: { text: args.input } };
@@ -1437,7 +1440,7 @@ export async function* runAgent(base, args) {
       return `模型机签名有效 · ${String(v.signing_address ?? "?").slice(0, 12)}…`;
     };
     calls.forEach((c, i) => checks.push({ name: `${label}模型调用 #${i + 1}`,
-      status: c.ok && c.verified ? "PASS" : c.ok ? "FAIL" : c.aux || calls.slice(i + 1).some((d) => d.ok) ? "WARN" : "FAIL",
+      status: c.ok && c.verified ? "PASS" : c.ok ? "FAIL" : stopped || c.aux || calls.slice(i + 1).some((d) => d.ok) ? "WARN" : "FAIL",
       detail: `${c.provider}/${c.model}${c.aux ? " · 辅助调用" : ""} · ${c.reused ? "沿用验证" : "完整验证"} · ${c.seconds}s` +
               (c.ok && c.verified ? ` · ${proof(c)}` : c.ok ? " · 无核对结果" : "") +
               (c.tool_calls && c.tool_calls.length ? ` · 工具 ${c.tool_calls.join("、")}` : "") +

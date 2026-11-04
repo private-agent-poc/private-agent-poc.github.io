@@ -50,6 +50,7 @@ button { font: inherit; color: inherit; }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .btn.primary:hover:not(:disabled) { box-shadow: var(--glow); }
+.btn.primary.stop { background: var(--fail-soft); color: var(--fail); border-color: var(--fail); }
 .btn.ghost { color: var(--muted); }
 .btn.small { padding: 5px 12px; font-size: 13px; }
 

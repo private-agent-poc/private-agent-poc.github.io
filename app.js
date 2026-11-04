@@ -3,7 +3,7 @@ import * as V from "./verify.js";
 const PCCS_URL = "https://pccs.phala.network";
 const APPROVED = [
   { app_id: "c3fd4ff7f667603320296795348aa605e214d51b",
-    compose_hash: "74018cda9bb3dc881be42a2af2291db52774c53935dc2127c234b94e99c4b623",
+    compose_hash: "7b658b978c15da831c7242adc827a83f344a8241deed925b1353ca789c06528d",
     note: "pa-attest-mvp · 带 hermes · 2026-11-04" },
 ];
 const COLLATERAL_NOTE = "CVM 转交 · Intel 签名 · 浏览器本地验签";
@@ -154,6 +154,7 @@ const worst = (checks) => {
   const s = checks.map((c) => c.status);
   return s.includes("FAIL") ? "fail" : s.includes("WARN") ? "warn" : "pass";
 };
+const INTERRUPTED = /^Operation interrupted\b/;
 const clock = (t) => new Date(t).toLocaleTimeString("zh-CN", { hour12: false });
 const errText = (e) => (e && e.message ? e.message : String(e));
 
@@ -179,7 +180,7 @@ function newRecord(kind, title) {
 }
 
 const HEAD = ["kind", "title", "time", "status", "stages", "sections", "counts", "elapsed", "reply", "auth", "blocked", "serviceError",
-              "error", "simulated", "provider", "model", "chat", "renewed", "agent", "internet", "stream", "attachments"];
+              "error", "simulated", "provider", "model", "chat", "renewed", "agent", "internet", "stream", "attachments", "stopped"];
 let dbOpen = null;
 
 function recordDb() {
@@ -520,7 +521,30 @@ function renderTabs() {
 }
 
 function updateComposer() {
-  $("#send-btn").disabled = state.busy || Boolean(state.agent && chatOf(state.chat).busy);
+  const c = state.agent ? chatOf(state.chat) : null;
+  const stop = Boolean(c && c.busy && !$("#msg").value.trim());
+  const btn = $("#send-btn");
+  btn.disabled = state.busy || Boolean(stop && c.stopping);
+  btn.textContent = stop ? (c.stopping ? "停止中" : "停止") : "发送";
+  btn.classList.toggle("stop", stop);
+}
+
+async function stopChat(chat) {
+  const c = chatOf(chat);
+  if (c.stopping || !state.session) return;
+  c.stopping = true;
+  for (const r of state.records) if (r.chat === chat && r.agent && r.status === "running") { r.stopping = true; paintSoon(r); }
+  updateComposer();
+  try {
+    const { out } = await V.chat(state.base, state.session.res, { agent: "stop", chat }, state.token,
+                                 { sessionId: state.sessionId, knownNonces: state.nonces });
+    if (!out || !out.ok) throw new Error((out && out.error) || "没有返回");
+  } catch (e) {
+    flash(`停止失败：${errText(e)}`);
+  } finally {
+    c.stopping = false;
+    updateComposer();
+  }
 }
 
 async function switchChat(id) {
@@ -767,7 +791,7 @@ function attachResults(items, msgs) {
 function renderAgentBubble(a, rec) {
   a.textContent = "";
   a.classList.remove("error");
-  const items = (rec.stream && rec.stream.items) || [];
+  const items = ((rec.stream && rec.stream.items) || []).filter((it) => !(rec.stopped && it.kind === "text" && INTERRUPTED.test(it.text)));
   for (const it of items) {
     if (it.kind !== "text") {
       a.append(it.kind === "think" ? thinkBlock(it) : toolCard(it));
@@ -784,7 +808,9 @@ function renderAgentBubble(a, rec) {
   if (failed) {
     a.classList.toggle("error", !items.some((it) => it.kind === "text" && it.text));
     a.append(el("div", null, rec.blocked ? "未发送：证明未通过" : rec.error || rec.serviceError));
-  } else if (rec.status === "running") {
+  } else if (rec.stopped) a.append(el("div", "agent-status", "已停止"));
+  else if (rec.status === "running" && rec.stopping) a.append(el("div", "agent-status", "正在停止…"));
+  else if (rec.status === "running") {
     if (!items.some((it) => it.kind === "text" && it.text)) a.append(el("span", "typing-dots"));
     const st = rec.stream && callStatus(rec.stream);
     if (st) a.append(st);
@@ -851,7 +877,8 @@ function onAgentEvent(rec, ev) {
     }
     s.call = { n: ev.n, model: ev.model, running: false, error: ev.ok ? null : ev.error };
     if (!ev.ok) s.failures = (s.failures || 0) + 1;
-  } else if (ev.type === "run.failed" || ev.type === "run.cancelled" || ev.type === "error") rec.serviceError = ev.error || ev.type;
+  } else if (ev.type === "run.cancelled") rec.stopped = true;
+  else if (ev.type === "run.failed" || ev.type === "error") rec.serviceError = ev.error || ev.type;
 }
 
 function callStatus(s) {
@@ -940,7 +967,8 @@ function historyTurns(msgs) {
     }
     if (!agent) turns.push((agent = { role: "agent", items: [], time, ms }));
     if (m.role === "assistant") {
-      if (m.content) agent.items.push({ kind: "text", text: m.content });
+      if (m.content && INTERRUPTED.test(m.content)) agent.items.push({ kind: "text", text: "已停止" });
+      else if (m.content) agent.items.push({ kind: "text", text: m.content });
       for (const t of m.tool_calls || []) agent.items.push({ kind: "tool", name: t.name || t, args: t.args, status: "done" });
     } else attachResults(agent.items, [m]);
   }
@@ -1080,18 +1108,33 @@ async function onSendAgent(text, simulate, chat) {
 async function onSend(ev) {
   ev.preventDefault();
   const text = $("#msg").value.trim();
-  if ((!text && !(state.agent && state.atts.length)) || state.busy) return;
   const simulate = $("#simulate").checked;
+  if (state.agent && chatOf(state.chat).busy) {
+    const chat = state.chat;
+    const c = chatOf(chat);
+    if (text || state.atts.length) {
+      c.next = { text, simulate };
+      $("#msg").value = "";
+      flash("先停下当前这一轮，停下后马上发送");
+    } else if (ev.submitter !== $("#send-btn")) return;
+    stopChat(chat);
+    return;
+  }
+  if ((!text && !(state.agent && state.atts.length)) || state.busy) return;
   if (state.agent) {
     const chat = state.chat;
     const c = chatOf(chat);
-    if (c.busy) return;
     $("#msg").value = "";
     c.busy = true;
     updateComposer();
     renderTabs();
     try {
-      await onSendAgent(text, simulate, chat);
+      let next = { text, simulate };
+      while (next) {
+        await onSendAgent(next.text, next.simulate, chat);
+        next = c.next;
+        c.next = null;
+      }
     } finally {
       c.busy = false;
       updateComposer();
@@ -2198,6 +2241,7 @@ for (const t of ["dragover", "dragleave", "drop"]) {
   });
 }
 setInterval(pollHistory, 15000);
+$("#msg").addEventListener("input", updateComposer);
 $("#msg").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#composer").requestSubmit(); }
 });

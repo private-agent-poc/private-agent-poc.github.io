@@ -859,30 +859,75 @@ def call_chutes(messages: list, nonce, sess: dict | None = None, req: dict | Non
     slot = "chutes" if model == CHUTES_MODEL else "chutes:" + model
     up = {"nonce": nonce, "chute_id": cid, "attempts": []}
     out["upstream"] = up
-    chosen = None
     instances = e2e_instances(cid)
-    c = cached(sess, slot)
-    if c:
-        i = next((x for x in instances if x["instance_id"] == c["instance_id"] and x["e2e_pubkey"] == c["e2e_pubkey"]), None)
-        if i:
-            chosen = (i, c["evidence"], c["result"])
-            up.update(nonce=c["nonce"], reused={"verified_at": c["verified_at"]})
-        else:
-            sess.pop(slot, None)
-    if chosen is None:
-        for i in instances[:3]:
-            try:
-                ev = api_json("GET", f"{CHUTES_API}/instances/{i['instance_id']}/evidence?nonce={nonce}", CHUTES_API_KEY)
-                chosen = (i, ev, verify_chutes(ev, nonce, i["e2e_pubkey"]))
-                sess[slot] = {"verified_at": time.time(), "instance_id": i["instance_id"], "e2e_pubkey": i["e2e_pubkey"],
-                                  "evidence": ev, "result": chosen[2], "nonce": nonce}
-                break
-            except Exception as e:
-                up["attempts"].append({"instance_id": i["instance_id"], "error": f"{type(e).__name__}: {e}"})
-    up["verify_seconds"] = round(time.time() - t0, 2)
-    if chosen is None:
-        out["error"] = "没有通过验证的 Chutes 实例，消息未发送"
+    full = set()
+    for _ in range(3):
+        chosen = chutes_pick(sess, slot, instances, nonce, up, full)
+        up["verify_seconds"] = round(time.time() - t0, 2)
+        if chosen is None:
+            out["error"] = (f"{out['error']}（已换过 {len(full)} 个实例）" if full else "没有通过验证的 Chutes 实例，消息未发送")
+            return out
+        sent = chutes_invoke(chosen, cid, model, messages, req, on_delta, up)
+        st, data = sent["status"], sent["data"]
+        if st != 429:
+            break
+        sess.pop(slot, None)
+        full.add(chosen[0]["instance_id"])
+        out["error"] = upstream_error("Chutes", st, data)
+        up["attempts"].append({"instance_id": chosen[0]["instance_id"], "error": out["error"]})
+    else:
+        out["error"] = f"{out['error']}（已换过 {len(full)} 个实例）"
         return out
+    out.pop("error", None)
+    i = chosen[0]
+    up["invoke_seconds"] = sent["seconds"]
+    up["request"] = sent["request"]
+    up["request_ciphertext_bytes"] = len(sent["blob"])
+    if st != 200:
+        sess.pop(slot, None)
+        out["error"] = upstream_error("Chutes", st, data)
+        return out
+    up["response_ciphertext_bytes"] = len(data)
+    if sent["acc"]:
+        up["response"] = sent["acc"].result()
+    else:
+        rct, rest = data[:1088], data[1088:]
+        up["response"] = json.loads(gzip.decompress(ChaCha20Poly1305(mlkem_key(sent["sk"].decapsulate(rct), rct, b"e2e-resp-v1"))
+                                                    .decrypt(rest[:12], rest[12:], None)))
+    out["response"] = up["response"]
+    out["verified"] = {"instance_id": i["instance_id"], "e2e": "ML-KEM-768 + ChaCha20-Poly1305", "stream_chunks": up.get("stream_chunks"),
+                       "reused": bool(up.get("reused"))}
+    try:
+        out["reply"] = up["response"]["choices"][0]["message"]["content"].strip()
+    except (KeyError, IndexError, TypeError, AttributeError):
+        out["reply"] = None
+    return out
+
+
+def chutes_pick(sess: dict, slot: str, instances: list, nonce: str, up: dict, skip: set):
+    c = cached(sess, slot)
+    if c and c["instance_id"] not in skip:
+        i = next((x for x in instances if x["instance_id"] == c["instance_id"] and x["e2e_pubkey"] == c["e2e_pubkey"] and x["nonces"]), None)
+        if i:
+            up.update(nonce=c["nonce"], reused={"verified_at": c["verified_at"]})
+            return i, c["evidence"], c["result"]
+        sess.pop(slot, None)
+    up.pop("reused", None)
+    up["nonce"] = nonce
+    tried = {a["instance_id"] for a in up["attempts"]}
+    for i in [x for x in instances if x["instance_id"] not in skip and x["instance_id"] not in tried and x["nonces"]][:3]:
+        try:
+            ev = api_json("GET", f"{CHUTES_API}/instances/{i['instance_id']}/evidence?nonce={nonce}", CHUTES_API_KEY)
+            result = verify_chutes(ev, nonce, i["e2e_pubkey"])
+            sess[slot] = {"verified_at": time.time(), "instance_id": i["instance_id"], "e2e_pubkey": i["e2e_pubkey"],
+                          "evidence": ev, "result": result, "nonce": nonce}
+            return i, ev, result
+        except Exception as e:
+            up["attempts"].append({"instance_id": i["instance_id"], "error": f"{type(e).__name__}: {e}"})
+    return None
+
+
+def chutes_invoke(chosen, cid: str, model: str, messages: list, req: dict | None, on_delta, up: dict) -> dict:
     i, ev, v = chosen
     up.update({"instance_id": i["instance_id"], "e2e_pubkey": i["e2e_pubkey"],
                "evidence": {k: ev.get(k) for k in ("attested_body", "signature", "certificate")}, **v})
@@ -921,28 +966,8 @@ def call_chutes(messages: list, nonce, sess: dict | None = None, req: dict | Non
             need(inner.done, "Chutes 流没有正常结束（缺少 [DONE]）")
     else:
         st, data, _, _ = fetch("POST", f"{CHUTES_API}/e2e/invoke", blob, headers, 300)
-    up["invoke_seconds"] = round(time.time() - t1, 2)
-    up["request"] = request
-    up["request_ciphertext_bytes"] = len(blob)
-    if st != 200:
-        sess.pop(slot, None)
-        out["error"] = upstream_error("Chutes", st, data)
-        return out
-    up["response_ciphertext_bytes"] = len(data)
-    if acc:
-        up["response"] = acc.result()
-    else:
-        rct, rest = data[:1088], data[1088:]
-        up["response"] = json.loads(gzip.decompress(ChaCha20Poly1305(mlkem_key(response_sk.decapsulate(rct), rct, b"e2e-resp-v1"))
-                                                    .decrypt(rest[:12], rest[12:], None)))
-    out["response"] = up["response"]
-    out["verified"] = {"instance_id": i["instance_id"], "e2e": "ML-KEM-768 + ChaCha20-Poly1305", "stream_chunks": up.get("stream_chunks"),
-                       "reused": bool(up.get("reused"))}
-    try:
-        out["reply"] = up["response"]["choices"][0]["message"]["content"].strip()
-    except (KeyError, IndexError, TypeError, AttributeError):
-        out["reply"] = None
-    return out
+    return {"status": st, "data": data, "sk": response_sk, "acc": acc, "blob": blob, "request": request,
+            "seconds": round(time.time() - t1, 2)}
 
 
 def runtime_preimage(e: dict) -> bytes:
@@ -1251,6 +1276,7 @@ def model_catalog() -> dict:
 
 TURNS: dict = {}
 CHAT_LOCKS: dict = {}
+CHAT_TURNS: dict = {}
 CHATS_LOCK = threading.RLock()
 TURN_TOKEN = re.compile(r"t-[0-9a-f]{8}")
 VISION_STUB = "[图片：当前模型不能看图，CVM 已把图片去掉]"
@@ -1344,11 +1370,19 @@ def proxy_completion(body: dict):
     if turn is not None:
         aux = not body.get("tools")
         turn["emit"]({"type": "model.started", "provider": provider, "model": model, "n": len(turn["calls"]) + 1, "aux": aux})
-        deltas = Deltas(turn["emit"], len(turn["calls"]) + 1, aux)
-    try:
-        out = CALLERS[provider](body.get("messages") or [], nonce, sess, {**body, "model": model}, *([deltas] if deltas else []))
-    except Exception as e:
-        out = {"mode": provider, "model": model, "error": scrub(f"{type(e).__name__}: {e}")}
+        deltas = Deltas(lambda ev: None if turn.get("stopped") else turn["emit"](ev), len(turn["calls"]) + 1, aux)
+    box = {}
+
+    def call():
+        try:
+            box["out"] = CALLERS[provider](body.get("messages") or [], nonce, sess, {**body, "model": model}, *([deltas] if deltas else []))
+        except Exception as e:
+            box["out"] = {"mode": provider, "model": model, "error": scrub(f"{type(e).__name__}: {e}")}
+    worker = threading.Thread(target=call, daemon=True)
+    worker.start()
+    while worker.is_alive() and not turn.get("stopped"):
+        worker.join(0.5)
+    out = box.get("out") or {"mode": provider, "model": model, "error": "这一轮已被停止"}
     if deltas:
         deltas.flush()
     resp = out.get("response") if provider != "phala" or out.get("upstream_status") == 200 else None
@@ -1361,7 +1395,8 @@ def proxy_completion(body: dict):
                               "seconds": round(time.time() - t0, 2), "ok": resp is not None and not out.get("error"),
                               "error": out.get("error"), "tool_calls": [tc.get("function", {}).get("name") for tc in msg.get("tool_calls") or []]})
         best, aux = turn["evidence"].get(provider), not body.get("tools")
-        if best is None or best.get("error") or (best.get("aux") and not aux and not out.get("error")):
+        cut_short = turn.get("stopped") and out.get("error")
+        if not cut_short and (best is None or best.get("error") or (best.get("aux") and not aux and not out.get("error"))):
             turn["evidence"][provider] = {**out, "aux": aux, "call": len(turn["calls"])}
         turn["emit"]({"type": "model.completed", "n": len(turn["calls"]), **turn["calls"][-1]})
     if resp is None or out.get("error"):
@@ -1607,6 +1642,8 @@ def agent_request(inner: dict) -> dict:
             need(chats_path(), "没有配置 agent 状态目录")
             delete_chat(chat_id(inner))
             return {"ok": True, "chats": list_chats()}
+        if op == "stop":
+            return {"ok": True, "stopped": stop_chat(chat_id(inner))}
         if op != "history":
             return {"error": "未知操作"}
         sid = chat_id(inner)
@@ -1672,55 +1709,103 @@ def agent_turn(inner: dict, emit):
     need(content or parts, "消息是空的")
     payload = [{"type": "text", "text": content}, *parts] if parts else content
     sid = chat_id(inner)
+    token = "t-" + secrets.token_hex(4)
+    turn = {"active": False, "stopped": False, "run_id": None, "nonce": nonce, "sess": session_of(inner), "calls": [],
+            "evidence": {}, "emit": emit, "egress": [], "chat": sid, "token": token, "provider": provider, "model": model}
     with CHATS_LOCK:
         lock = CHAT_LOCKS.setdefault(sid, threading.Lock())
-    if not lock.acquire(blocking=False):
-        emit({"type": "turn.queued", "chat": sid})
-        need(lock.acquire(timeout=900), "这个会话上一轮 15 分钟还没结束，稍后再试")
-    token = "t-" + secrets.token_hex(4)
-    turn = {"active": True, "nonce": nonce, "sess": session_of(inner), "calls": [], "evidence": {}, "emit": emit, "egress": [],
-            "chat": sid, "token": token, "provider": provider, "model": model}
+        CHAT_TURNS.setdefault(sid, []).append(turn)
     internet = internet_on()
     try:
-        TURNS[token] = turn
-        emit({"type": "turn.started", "provider": provider, "model": model, "attachments": names, "session": sid, "chat": sid,
-              "internet": internet, "egress": bool(EGRESS_PORT), "isolated": AGENT_NET_ISOLATED})
-        routed = f"{token}/{provider}/{model}"
-        agent_json("POST", f"/api/sessions/{urllib.parse.quote(sid)}/model", {"model": routed, "provider": AGENT_PROVIDER})
-        conn, r = agent_http("POST", f"/api/sessions/{urllib.parse.quote(sid)}/chat/stream",
-                             {"input": payload, "model": routed, "provider": AGENT_PROVIDER,
-                              **({} if internet else {"system_message": NET_OFF_NOTE})}, timeout=900)
-        try:
-            if r.status != 200:
-                raise Rejected(f"agent HTTP {r.status}: {r.read()[:200].decode('utf-8', 'replace')}")
-            event = None
-            for raw in r:
-                line = raw.decode("utf-8", "replace").rstrip("\r\n")
-                if line.startswith("event:"):
-                    event = line[6:].strip()
-                elif line.startswith("data:") and event in AGENT_EVENTS:
-                    try:
-                        data = json.loads(line[5:].strip())
-                    except ValueError:
-                        continue
-                    emit({"type": event, **{k: data[k] for k in ("delta", "content", "text", "tool", "name", "tool_name", "args",
-                                                                  "arguments", "result", "preview", "error", "usage", "message_id",
-                                                                  "already_streamed") if k in data}})
-                    if event in ("run.completed", "run.failed", "run.cancelled"):
-                        break
-                elif not line:
+        if not wait_turn(turn, lock, emit):
+            emit({"type": "run.cancelled", "chat": sid})
+        else:
+            try:
+                TURNS[token] = turn
+                turn["active"] = not turn["stopped"]
+                emit({"type": "turn.started", "provider": provider, "model": model, "attachments": names, "session": sid, "chat": sid,
+                      "internet": internet, "egress": bool(EGRESS_PORT), "isolated": AGENT_NET_ISOLATED})
+                routed = f"{token}/{provider}/{model}"
+                agent_json("POST", f"/api/sessions/{urllib.parse.quote(sid)}/model", {"model": routed, "provider": AGENT_PROVIDER})
+                conn, r = agent_http("POST", f"/api/sessions/{urllib.parse.quote(sid)}/chat/stream",
+                                     {"input": payload, "model": routed, "provider": AGENT_PROVIDER,
+                                      **({} if internet else {"system_message": NET_OFF_NOTE})}, timeout=900)
+                try:
+                    if r.status != 200:
+                        raise Rejected(f"agent HTTP {r.status}: {r.read()[:200].decode('utf-8', 'replace')}")
                     event = None
-        finally:
-            conn.close()
+                    for raw in r:
+                        line = raw.decode("utf-8", "replace").rstrip("\r\n")
+                        if line.startswith("event:"):
+                            event = line[6:].strip()
+                        elif line.startswith("data:") and event in AGENT_EVENTS:
+                            try:
+                                data = json.loads(line[5:].strip())
+                            except ValueError:
+                                continue
+                            if not turn["run_id"] and data.get("run_id"):
+                                turn["run_id"] = str(data["run_id"])
+                                if turn["stopped"]:
+                                    stop_turn(turn)
+                            emit({"type": event, **{k: data[k] for k in ("delta", "content", "text", "tool", "name", "tool_name", "args",
+                                                                          "arguments", "result", "preview", "error", "usage", "message_id",
+                                                                          "already_streamed") if k in data}})
+                            if event in ("run.completed", "run.failed", "run.cancelled"):
+                                break
+                        elif not line:
+                            event = None
+                finally:
+                    conn.close()
+            finally:
+                turn["active"] = False
+                TURNS.pop(token, None)
+                lock.release()
+                cut_tunnels(lambda t: not any(k in TURNS for k in t["tokens"]))
     finally:
-        turn["active"] = False
-        TURNS.pop(token, None)
-        lock.release()
-        cut_tunnels(lambda t: not any(k in TURNS for k in t["tokens"]))
+        with CHATS_LOCK:
+            left = [t for t in CHAT_TURNS.get(sid, []) if t is not turn]
+            if left:
+                CHAT_TURNS[sid] = left
+            else:
+                CHAT_TURNS.pop(sid, None)
     emit({"type": "upstream", "nonce": nonce, "calls": turn["calls"], "internet": internet, "internet_now": internet_on(),
           "egress": turn["egress"], "egress_port": bool(EGRESS_PORT), "isolated": AGENT_NET_ISOLATED,
-          "evidence": {p: slim_evidence(o) for p, o in turn["evidence"].items()}})
+          "stopped": turn["stopped"], "evidence": {p: slim_evidence(o) for p, o in turn["evidence"].items()}})
 
+
+def wait_turn(turn: dict, lock, emit) -> bool:
+    if not lock.acquire(blocking=False):
+        emit({"type": "turn.queued", "chat": turn["chat"]})
+        deadline = time.time() + 900
+        while not lock.acquire(timeout=0.5):
+            if turn["stopped"]:
+                return False
+            need(time.time() < deadline, "这个会话上一轮 15 分钟还没结束，稍后再试")
+    if turn["stopped"]:
+        lock.release()
+        return False
+    return True
+
+
+def stop_turn(turn: dict):
+    turn["stopped"] = True
+    turn["active"] = False
+    cut_tunnels(lambda t: not any(TURNS.get(k, {}).get("active") for k in t["tokens"]))
+    if turn.get("run_id"):
+        try:
+            conn, r = agent_http("POST", f"/v1/runs/{urllib.parse.quote(turn['run_id'], safe='')}/stop", {})
+            r.read()
+            conn.close()
+        except Exception:
+            pass
+
+
+def stop_chat(sid: str) -> int:
+    with CHATS_LOCK:
+        turns = list(CHAT_TURNS.get(sid, []))
+    for t in turns:
+        stop_turn(t)
+    return len(turns)
 
 NET_TOOLS = ("web_", "browser_")
 NET_OFF_NOTE = ("本轮用户关闭了联网：web_search、web_extract 和 browser_* 工具不可用，终端里访问外网也会被拒绝。"
