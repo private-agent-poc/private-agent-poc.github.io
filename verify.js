@@ -31,6 +31,8 @@ export const KNOWN_PROD_IMAGES = {
 export const KNOWN_RTMR0 = {
   "68102e7b524af310f7b7d426ce75481e36c40f5d513a9009c046e9d37e31551f0134d954b496a3357fd61d03f07ffe96":
     "1 vCPU / 2 GB（Phala tdx.small，QEMU 8.2.2）",
+  "027b610ab0555482f8a3868524093bdf3cdbe2539f81dfeeb886864654cb2fe3422f7fc36d4bab6fa46683aad11d1ba7":
+    "2 vCPU / 4 GB（Phala tdx.medium，QEMU 8.2.2）",
   "46a83f6bbbeaa274aaf04861ef47d7e8898d4e699126b642f72f582e8d7f5349cb266a188bbabf619940d4fece06594b":
     "32 vCPU / 32 GB（Phala 推理网关，QEMU 8.2.2）",
 };
@@ -40,6 +42,94 @@ const TCB_WARN = new Set(["ConfigurationNeeded", "ConfigurationAndSWHardeningNee
 const HEX64 = /^[0-9a-f]{64}$/;
 export const GATEWAY_HOST = "inference.phala.com";
 const COLLATERAL_TTL_MS = 10 * 60 * 1000;
+const TCB_LOCAL = "LocalDev";
+export const SESSION_TTL = 15 * 60;
+
+export const NEAR_PINS = {
+  "image": "dstack-nvidia-0.5.12",
+  "observed": "2026-10-28、2026-11-04",
+  "mrtd": ["7fe60787222bd394cb516abca2435f22f035ab2cc9c0a4b4b3b148e46297f3d931a237b72f359052c6e657d8c1409173", "df4d77c857de652bd0fafa343a2026b51071ee03773d076d283abf1a7d36ff91ffa279ee4a617ac664f7e2a2c8d5891b"],
+  "rtmr0": ["bc122d143ab768565ba5c3774ff5f03a63c89a4df7c1f5ea38d3bd173409d14f8cbdcc36d40e703cccb996a9d9687590", "f0f303d15fb7619b87ec60daf0db241e937b30a4e1f2c405b5420f14b27c6e301735094feea9693a33b868d00eeb07f9"],
+  "rtmr1": "4ae609807c765916a31d724786ed74bcb97e168a9d937b04936aeef2015c907eba5ac352c6bcd749c246fd62ffb659ec",
+  "rtmr2": "bd67ab7554dc27ab03a077bc1447a1a67d0624ff547c4c809a8626f12d6a89712f8ec60e781e99b98208574065d21a71",
+  "os_image_hash": "91fd5d69ccee3e5ea4f2aeb8c9b632c4358c4ecfc29ba1aa6fb1e402af209829",
+  "kms": "3059301306072a8648ce3d020106082a8648ce3d03010703420004394aaed2c745e6a457cb835f7f47423f57ff3ead71b92abff6bdc14d905b319f2e13961b42c50740dae4498d9c51dd7a2e227660c9e5c504083cda06b6c11682",
+  "app_ids": ["2c0a0c96cb6dbd659bf1446e2f3fce58172ff91b"],
+  "compose_hashes": ["5e513dbd72e1c0f291f748ad06d4dbc1df55659869e649376213ac7b3c9d2e29", "31d3b2389e06a4450e342f3a45fdbb5d7ce4c607c359f5b291635548b0b80007"],
+};
+
+export const CHUTES_PINS = {
+  "source": "https://api.chutes.ai/servers/tee/measurements",
+  "fetched": "2026-10-28",
+  "images": {
+    "1.3.1": {"mrtd": "261ce538b435e2d0e85fc97e254bc99154c507b7a8e13d59b69f8532384f1d0bfaadfddf3fccc6e0a411203840bbee8d", "rtmr1": "9b8b2915351a3166f742024edafb6cce244c1df4056eb1f9eb608c3616b9d63729ae00c98d1dc108009c0978b19dc207", "rtmr2": "8471360414fe80b4343fb17dd59e442bdc55b5955df0adf610b1de15ad7b454e98fb8e9d38cc188b82369f4f620b6968", "rtmr3": "51204be641a2af357f5f4e6a121d348d6cb1cbe53c4c35d9dcc3364196b4d41a6e1de75025bb2e76f3b00cc7192f9433"},
+    "1.4.0": {"mrtd": "261ce538b435e2d0e85fc97e254bc99154c507b7a8e13d59b69f8532384f1d0bfaadfddf3fccc6e0a411203840bbee8d", "rtmr1": "d3a862ff47357f374fc72c7f02a480a13790d1805e24aaa8de1f03994256625ce0f593ae35ea8f0c24d09f7df36cb0ed", "rtmr2": "8feee49b83c0f912f9ab9366a7423f65417bb60223c1871a5d55e84d92d741c80017b3f856317c45295255db70f8dc3e", "rtmr3": "7e7adbc834a3e746278f28c607a94ba93407a7b25055daca4836cc6003e9bfb5f48836fa0e1d6ab6637c187dd142e5f6"},
+    "1.4.1": {"mrtd": "261ce538b435e2d0e85fc97e254bc99154c507b7a8e13d59b69f8532384f1d0bfaadfddf3fccc6e0a411203840bbee8d", "rtmr1": "d3a862ff47357f374fc72c7f02a480a13790d1805e24aaa8de1f03994256625ce0f593ae35ea8f0c24d09f7df36cb0ed", "rtmr2": "da23f73e0fddeb8128f706ecfbecbcf8cee34af7e4907d8fbc85e9b216acee27bf6cc3655eaf4d33cab76adea79fa153", "rtmr3": "d9dc4c6079fb12a21ad2aa8e329d8bfa61aaa13d3ffd10a93a2c4e82f0e35efbf28f5cf3bed0c0c1b517a7c327a25226"},
+    "1.5.0": {"mrtd": "261ce538b435e2d0e85fc97e254bc99154c507b7a8e13d59b69f8532384f1d0bfaadfddf3fccc6e0a411203840bbee8d", "rtmr1": "d3a862ff47357f374fc72c7f02a480a13790d1805e24aaa8de1f03994256625ce0f593ae35ea8f0c24d09f7df36cb0ed", "rtmr2": "e1de99043052f3e1ab5a4463d3310b5680e851631adf10e071b15cbd8b4d664ea435b0ec33e7f18e908dda60734056f7", "rtmr3": "9617be835beac8c62093a9db424f015f3e12651235d0101c112729e7225b7a70836a184dee0b45f28cd190f1871afe6e"}
+  },
+  "rows": [
+    ["1.3.1", "8xh200 [10.2.1]", "212d8284fe29a52a033cd662763e452915d2002bcc3c3e73aa660b100087bd3cce8aef414c3d7012f6a857f392c1919b", ["h200"], 8],
+    ["1.3.1", "8xh200 [10.2.1, NVSW0]", "c90a27d633d97e2f785a0a65c4a7ee2258872655e3bada2cad0e719e313db542fd35c6889897d9ae6369f82e39877861", ["h200"], 8],
+    ["1.3.1", "8xh200 [10.2.1, FLAT]", "b237753a1c8a05042209947fc0f98c8459783db7f3411860c38249c5abd4efd8c6fb7820036ff19b5099138aaf9e0bd1", ["h200"], 8],
+    ["1.3.1", "8xh200 [10.1.0]", "7e76988fae31dda82f0043b331d908f0716e9da24fed80b6ea6cec9b6615ff84f24321056a8befbea3fff67bd1e59205", ["h200"], 8],
+    ["1.3.1", "8xh200 [10.1.0, NVSW0]", "cdf7169a9f90c4d2fd29f89579f4ad7b90c272d607bc7ba2365e91560a248b9eafe01940f3c1e9d6bd6987573080b6c1", ["h200"], 8],
+    ["1.3.1", "8xh200 [10.1.0-flat]", "ed373dfcc4e3b9cc57282773784c88445699f95705ec0995959c4aa95f9dec454c76da891fa56f820f547b02db8c1f2f", ["h200"], 8],
+    ["1.3.1", "8xRTX_PRO_6000 [10.1.0]", "0917443cc41e9a5afebc8e87e69a63f32208c47d4b4b4fd410fbc1a705e1880c1383a4ad51903a5ed20cb4090420185a", ["pro_6000"], 8],
+    ["1.3.1", "8xRTX_PRO_6000 [10.2.1, NUMA2-4/4]", "5fc09d108ef74d5505b876690de5ab5da02af463ba84bb33299efd1c02144b5d7a6ba579b3ff31ef9118350468e9faf2", ["pro_6000"], 8],
+    ["1.3.1", "8xRTX_PRO_6000 [10.2.1, NUMA2-3/5]", "1de32a41a8116e042f33e9cb813f1f6edfef1452c8b2cf54df5451a848ef8931e97f40927191acabfd111c8b8d66796a", ["pro_6000"], 8],
+    ["1.3.1", "8xRTX_PRO_6000 [10.2.1, FLAT]", "e9f0b31ce30e4917767d22ad26ad0a8f4edc095b8d9f4bbb36c9cc24fe274aa2dfe16ce3c961dac2d8cef3e6ae2e901d", ["pro_6000"], 8],
+    ["1.3.1", "8xRTX_PRO_6000 [10.2.1, FLAT, MSI-GNR]", "872d965083f0bab7d080bd7d40155ba1b2b911d883f391ab7d6b9d810abeefd058e04129d72c088cf4fd05c099a57704", ["pro_6000"], 8],
+    ["1.3.1", "8xb200 [10.2.1]", "35038cbb04f872ac6d2784b05c912c438007583e58960dc66fb02d1b04462dd5994f94536da37b5877ccd3dd27d8d54d", ["b200"], 8],
+    ["1.3.1", "8xb200 [10.2.1, IB4]", "555fc635cd49723dc33d53a9d53be82fd161be351174e5449a465bbeffbcbd01f36d89dcd25fad61bf4c9e65c570f5d6", ["b200"], 8],
+    ["1.3.1", "8xb200 [10.2.1, XEON6]", "65fd972e40ac4d8a933d10ebfc31f07336cf1e45a3864523427b454df5d3b9dd0043f10e975da39677b62d45860c13e3", ["b200"], 8],
+    ["1.3.1", "8xb200 [10.2.1, XEON6, 272CPU]", "9673907ceb0c9ca79337437bb91695e7a3d19e82df1e41de1b0d2db8081fccb5d82f26d479a5016553cb20964d5948b9", ["b200"], 8],
+    ["1.3.1", "8xb200 [10.2.1, XEON6, SNC3]", "ccef43242ef633a542405dbfe55d04d823a50586b0a07510d058ea88ad8d1f8281f227f00c664435d92b23431c4d1c3c", ["b200"], 8],
+    ["1.3.1", "8xb200 [10.2.1, ubuntu3]", "ff42d0f7b03cbe84f9e252d8f912b465852c8ee92584c5c047de134a46c8f1e1545683e713bbdd64e2af7d10e8bafaae", ["b200"], 8],
+    ["1.3.1", "8xb300", "91adf9667ba4c65bec5345a8c9b98010708d903847bf838c4526c3ebbc35561719e2127e48a3f6f77f651d71d2cbc8d4", ["b300"], 8],
+    ["1.3.1", "8xb300 [10.2.1, numa-256c]", "f24aaec75a6c8783222ab141f003f2180fce573ef9cc6ea3dcdc2fcb91c051650fcd74ec85f02e367f06ed71328d319b", ["b300"], 8],
+    ["1.4.0", "8xb300 [10.2.1, flat-252c-1944g]", "fc71a5a8edcb1f6d307d59e62ce257365df0f233ae2334691f99d2136832d911f8be975b92f88036db8a4906574519c4", ["b300"], 8],
+    ["1.4.0", "8xh200 [10.2.1, flat-188c-1128g-nvsw4]", "b72208e4b39593a82bbdbc394569bd6f8395f76bdcff5bce2bc72f4e2ca0b3202238d3b78952b497d725e04999e45435", ["h200"], 8],
+    ["1.4.0", "8xh200 [10.2.1, numa-124c-1128g-nvsw-node1]", "5b509103a3bf3c10dbf27a7da030a3d7ba93a81c0c8844de20e5dfee77611644a39cc7236313e9d0a99a8a8a703bbfc9", ["h200"], 8],
+    ["1.4.0", "8xb300 [10.2.1, numa-252c-2304g]", "b60b5c5817c762e3297ccec4e6a49289781fc5511738230bbc88e253e120635526b6082f8f4f6c31a2b3821d30a8b221", ["b300"], 8],
+    ["1.4.0", "8xpro_6000 [10.2.1, numa-124c-768g]", "5e939a6213a6751f162617c6e9a50461786b3f9a6a679ebf7706fa705e7934180825b2fae43a60877ea9117a1e4d4f60", ["pro_6000"], 8],
+    ["1.4.1", "8xb300 [10.2.1, flat-252c-1944g]", "fc71a5a8edcb1f6d307d59e62ce257365df0f233ae2334691f99d2136832d911f8be975b92f88036db8a4906574519c4", ["b300"], 8],
+    ["1.4.1", "8xh200 [10.2.1, numa-236c-1128g-nvsw-node1]", "a9cac743d296a96c7a0d6348f03be1e1a407f18ec215f0039e3dc1ea4c132eb1e4a5fe3783022ff3d252d4b30f1dbf9f", ["h200"], 8],
+    ["1.4.1", "8xh200 [10.2.1, numa-188c-1128g-nvsw-node0]", "052183ad6cca5ad4aef7e31dc3f6c47be2ba90c288a55420bf432301374f1bd9932ea7d6b5da999c4fecf578c4b0a21a", ["h200"], 8],
+    ["1.4.1", "8xh200 [10.2.1, flat-188c-1128g-nvsw4]", "b72208e4b39593a82bbdbc394569bd6f8395f76bdcff5bce2bc72f4e2ca0b3202238d3b78952b497d725e04999e45435", ["h200"], 8],
+    ["1.4.1", "8xh200 [10.2.1, flat-188c-1128g-nvsw4]", "b72208e4b39593a82bbdbc394569bd6f8395f76bdcff5bce2bc72f4e2ca0b3202238d3b78952b497d725e04999e45435", ["h200"], 8],
+    ["1.4.1", "8xh200 [10.2.1, numa-124c-1128g-nvsw-node1]", "5b509103a3bf3c10dbf27a7da030a3d7ba93a81c0c8844de20e5dfee77611644a39cc7236313e9d0a99a8a8a703bbfc9", ["h200"], 8],
+    ["1.4.1", "8xpro_6000 [10.2.1, flat-188c-768g]", "0e53740f96063640ec986e9f95a2cb601bd686c34229882a05fe7a4350d78735fc3dc2439b6052665ef888e38a292076", ["pro_6000"], 8],
+    ["1.4.1", "8xpro_6000 [10.2.1, numa-124c-768g] (58443435b208)", "bacb4abf7b19aba4a8307ebc7244706745de4fa627e669e7f06fd35c3303eea1903f58dc143d27b557da1a986e0e95f6", ["pro_6000"], 8],
+    ["1.4.1", "8xh200 [10.2.1, numa-188c-1128g-nvsw-node1]", "ba81dbf034d968fd4be0975c031cbe6451295d63cb509cd857372fc915dada1b24fc4e1b0486db4a276a9efb49d415e6", ["h200"], 8],
+    ["1.4.1", "8xh200 [10.2.1, numa-188c-987g]", "8bf87f63caf5265365315fcdeea36e791c6d16216898aa313a1f4ac6fb0181adef223b2b62ad94914b06e0066ceb4751", ["h200"], 7],
+    ["1.4.1", "8xb200 [10.2.1, flat-272c-1536g]", "44efeea3a647090c2969cca7f29963dde696d99542c28536a20ad3586a639ef7e230d8d4e325c55f3597dc7b58b30903", ["b200"], 8],
+    ["1.4.1", "8xb300 [10.2.1, numa-flatpci-252c-2304g]", "e861504d4a05ba1e949618ef759d6fbf0c69e4774b667e9fb876b664cb1bb70e3094d2cddc9ac6c52d4b5d352ba2e1d3", ["b300"], 8],
+    ["1.4.1", "8xpro_6000 [10.2.1, numa-124c-768g] (f2ab1d61fa64)", "5e939a6213a6751f162617c6e9a50461786b3f9a6a679ebf7706fa705e7934180825b2fae43a60877ea9117a1e4d4f60", ["pro_6000"], 8],
+    ["1.4.1", "8xb300 [10.2.1, flat-188c-2304g]", "bfaaf9a018fb3f10518b2706731ed010bc7d75f3ea3eabcc562ce4a794ab4ee88eba199e38f9013e96e1099a1cf7c49e", ["b300"], 8],
+    ["1.4.1", "8xb300 [10.2.1, numa-flatpci-188c-2304g]", "34c932b17fa65b230d848ad0ca6b8186dc347b129f926f968f6b607dae07e1968177684d209a1830d37b5d0486c97618", ["b300"], 8],
+    ["1.4.1", "8xpro_6000 [10.2.1, numa-204c-768g]", "a5488b5f4cf1484da23001e013a5ad3ff177836bf2cfdbde55dacded21b3eece5de43d4c4a2d5279f8ed8d24b9e072d6", ["pro_6000"], 8],
+    ["1.5.0", "8xb300 [10.2.1, flat-252c-1944g]", "fc71a5a8edcb1f6d307d59e62ce257365df0f233ae2334691f99d2136832d911f8be975b92f88036db8a4906574519c4", ["b300"], 8],
+    ["1.5.0", "8xh200 [10.2.1, flat-188c-1128g-nvsw4]", "b72208e4b39593a82bbdbc394569bd6f8395f76bdcff5bce2bc72f4e2ca0b3202238d3b78952b497d725e04999e45435", ["h200"], 8],
+    ["1.5.0", "8xh200 [10.2.1, flat-188c-1128g-nvsw4]", "b72208e4b39593a82bbdbc394569bd6f8395f76bdcff5bce2bc72f4e2ca0b3202238d3b78952b497d725e04999e45435", ["h200"], 8],
+    ["1.5.0", "8xh200 [10.2.1, numa-236c-1128g-nvsw-node1]", "a9cac743d296a96c7a0d6348f03be1e1a407f18ec215f0039e3dc1ea4c132eb1e4a5fe3783022ff3d252d4b30f1dbf9f", ["h200"], 8],
+    ["1.5.0", "8xh200 [10.2.1, numa-188c-1128g-nvsw-node0]", "052183ad6cca5ad4aef7e31dc3f6c47be2ba90c288a55420bf432301374f1bd9932ea7d6b5da999c4fecf578c4b0a21a", ["h200"], 8],
+    ["1.5.0", "8xb300 [10.2.1, numa-flatpci-188c-2304g]", "34c932b17fa65b230d848ad0ca6b8186dc347b129f926f968f6b607dae07e1968177684d209a1830d37b5d0486c97618", ["b300"], 8],
+    ["1.5.0", "8xpro_6000 [10.2.1, flat-252c-768g] (2f9da10068f0)", "c2857dd69249c2f976ad070359b7bebc828c9d39a899bebc1fc9077072d97c6137f626b9ce7280fff0aa7e68481f16c6", ["pro_6000"], 8],
+    ["1.5.0", "8xb300 [10.2.1, flat-188c-2304g]", "bfaaf9a018fb3f10518b2706731ed010bc7d75f3ea3eabcc562ce4a794ab4ee88eba199e38f9013e96e1099a1cf7c49e", ["b300"], 8],
+    ["1.5.0", "8xh200 [10.2.1, numa-124c-1128g-nvsw-node1]", "5b509103a3bf3c10dbf27a7da030a3d7ba93a81c0c8844de20e5dfee77611644a39cc7236313e9d0a99a8a8a703bbfc9", ["h200"], 8],
+    ["1.5.0", "8xpro_6000 [10.2.1, flat-188c-768g]", "0e53740f96063640ec986e9f95a2cb601bd686c34229882a05fe7a4350d78735fc3dc2439b6052665ef888e38a292076", ["pro_6000"], 8],
+    ["1.5.0", "8xpro_6000 [10.2.1, numa-124c-768g] (58443435b208)", "bacb4abf7b19aba4a8307ebc7244706745de4fa627e669e7f06fd35c3303eea1903f58dc143d27b557da1a986e0e95f6", ["pro_6000"], 8],
+    ["1.5.0", "8xh200 [10.2.1, numa-188c-1128g-nvsw-node1]", "ba81dbf034d968fd4be0975c031cbe6451295d63cb509cd857372fc915dada1b24fc4e1b0486db4a276a9efb49d415e6", ["h200"], 8],
+    ["1.5.0", "8xh200 [10.2.1, numa-188c-987g]", "8bf87f63caf5265365315fcdeea36e791c6d16216898aa313a1f4ac6fb0181adef223b2b62ad94914b06e0066ceb4751", ["h200"], 7],
+    ["1.5.0", "8xb200 [10.2.1, flat-272c-1536g]", "44efeea3a647090c2969cca7f29963dde696d99542c28536a20ad3586a639ef7e230d8d4e325c55f3597dc7b58b30903", ["b200"], 8],
+    ["1.5.0", "8xb200 [10.2.1, flat-208c-1536g]", "0e990b232dc6df68c5208dac9eb23f777950b7b9ce638b8299dd44ba97902cbcc035c97b704cb28a23643771f8438cbc", ["b200"], 8],
+    ["1.5.0", "8xb300 [10.2.1, numa-flatpci-252c-2304g]", "e861504d4a05ba1e949618ef759d6fbf0c69e4774b667e9fb876b664cb1bb70e3094d2cddc9ac6c52d4b5d352ba2e1d3", ["b300"], 8],
+    ["1.5.0", "8xpro_6000 [10.2.1, numa-124c-768g] (f2ab1d61fa64)", "5e939a6213a6751f162617c6e9a50461786b3f9a6a679ebf7706fa705e7934180825b2fae43a60877ea9117a1e4d4f60", ["pro_6000"], 8],
+    ["1.5.0", "8xpro_6000 [10.2.1, numa-204c-768g]", "a5488b5f4cf1484da23001e013a5ad3ff177836bf2cfdbde55dacded21b3eece5de43d4c4a2d5279f8ed8d24b9e072d6", ["pro_6000"], 8]
+  ],
+  "gpu_models": {"h200": ["GH100"], "b200": ["GB100"], "pro_6000": ["GB20X"]},
+  "nras_intermediates": ["ba14d00377699189b6762c22c744a9dbdc62aa9396097ada7150426c6ff39afc", "fd32837f954e2c45db073105166dfe6985ae0480bb113fba63b091a75affe896"],
+};
 
 const enc = new TextEncoder();
 const subtle = globalThis.crypto.subtle;
@@ -255,7 +345,8 @@ function errText(e) {
 export async function verifyReport(report, nonceHex, opts = {}) {
   const {
     label = "", quoteVerifier, collateral = null, requireCompose = true, expectComposeHash = null,
-    expectImage = null, expectSource = null, allowImages = null, allowRtmr0 = null, strictTcb = false,
+    expectImage = null, expectSource = null, allowImages = null, allowRtmr0 = null, strictTcb = false, strictImage = false,
+    approved = null,
   } = opts;
   const now = Math.floor(opts.now ?? Date.now() / 1000);
   const r = new Result();
@@ -280,9 +371,11 @@ export async function verifyReport(report, nonceHex, opts = {}) {
     const v = await quoteVerifier(quote, collateral, now);
     r.collateral = v.collateral;
     r.trace.tcb = { status: v.status, advisory_ids: v.advisory_ids || [] };
+    r.trace.collateral_given = Boolean(collateral);
     const adv = (v.advisory_ids || []).join(", ");
     const detail = `TCB 状态 ${v.status}` + (adv ? `；公告 ${adv}` : "");
-    if (TCB_PASS.has(v.status)) r.add(`${p}硬件证明：Intel TDX quote 签名链`, "PASS", detail);
+    if (v.status === TCB_LOCAL) r.add(`${p}硬件证明：Intel TDX quote 签名链`, "WARN", "本地调试：这份 quote 来自模拟的 dstack 接口，没有 Intel 签名，跳过验签");
+    else if (TCB_PASS.has(v.status)) r.add(`${p}硬件证明：Intel TDX quote 签名链`, "PASS", detail);
     else if (TCB_WARN.has(v.status) && !strictTcb) {
       r.add(`${p}硬件证明：Intel TDX quote 签名链`, "WARN", detail + "（签名有效，但平台补丁不是最新）");
     } else r.add(`${p}硬件证明：Intel TDX quote 签名链`, "FAIL", detail);
@@ -350,12 +443,12 @@ export async function verifyReport(report, nonceHex, opts = {}) {
   if (image) {
     r.add(`${p}系统镜像是官方正式版（固件、内核、rootfs 的度量）`, "PASS", `${image}：MRTD、RTMR1、RTMR2 与发布包算出的值一致`);
   } else {
-    r.add(`${p}系统镜像是官方正式版（固件、内核、rootfs 的度量）`, "WARN",
+    r.add(`${p}系统镜像是官方正式版（固件、内核、rootfs 的度量）`, strictImage ? "FAIL" : "WARN",
       `MRTD ${mrs.mrtd} RTMR2 ${mrs.rtmr2} 不在已知正式镜像里；dev 镜像可被 SSH 登录。` +
       "核对后用 dstack-mr 算出参考值，用 --allow-image 加入");
   }
   const rtmr0s = { ...KNOWN_RTMR0, ...(allowRtmr0 || {}) };
-  r.add(`${p}虚拟硬件配置（RTMR0）与参考值一致`, mrs.rtmr0 in rtmr0s ? "PASS" : "WARN",
+  r.add(`${p}虚拟硬件配置（RTMR0）与参考值一致`, mrs.rtmr0 in rtmr0s ? "PASS" : strictImage ? "FAIL" : "WARN",
     rtmr0s[mrs.rtmr0] || `RTMR0 ${mrs.rtmr0} 没有参考值；用 dstack-mr diagnose 按 vm_config 算出后用 --allow-rtmr0 加入`);
 
   const measured = named["compose-hash"] || [];
@@ -422,6 +515,13 @@ export async function verifyReport(report, nonceHex, opts = {}) {
   if (expectComposeHash) {
     const ok = r.compose_hash === expectComposeHash.toLowerCase().replace(/^0x/, "");
     r.add(`${p}compose-hash 与发布记录一致`, ok ? "PASS" : "FAIL", `预期 ${expectComposeHash}`);
+  }
+  if (approved) {
+    const hit = approved.find((a) => a.compose_hash === r.compose_hash && a.app_id === appId);
+    r.add(`${p}部署是已批准的那一份（app_id、compose-hash）`, hit ? "PASS" : "FAIL",
+          hit ? `${hit.note || "已批准"} · ${appId}` : `app_id ${appId ?? "None"} · compose-hash ${r.compose_hash ?? "None"} 不在已批准列表里`);
+    const logs = r.app_compose ? r.app_compose.public_logs : undefined;
+    r.add(`${p}容器日志不公开（public_logs = false）`, logs === false ? "PASS" : "FAIL", `public_logs ${logs ?? "None"}`);
   }
 
   const osHashes = named["os-image-hash"] || [];
@@ -502,12 +602,28 @@ export class ClientChannel {
     return ch;
   }
 
-  async seal(plaintext) {
+  async seal(plaintext, b64 = false) {
     this.reqNonce = globalThis.crypto.getRandomValues(new Uint8Array(12));
     const ct = new Uint8Array(await subtle.encrypt(
       { name: "AES-GCM", iv: this.reqNonce, additionalData: concat("pa-mvp/req/v1|", this.digest) }, this.key, plaintext));
-    return { key_id: this.serverKey.key_id, client_public_key: bytesToHex(this.clientPub),
-             nonce: bytesToHex(this.reqNonce), ciphertext: bytesToHex(ct) };
+    const head = { key_id: this.serverKey.key_id, client_public_key: bytesToHex(this.clientPub), nonce: bytesToHex(this.reqNonce) };
+    return b64 ? { ...head, ciphertext_b64: bytesToB64(ct) } : { ...head, ciphertext: bytesToHex(ct) };
+  }
+
+  async openFrame(f) {
+    return new Uint8Array(await subtle.decrypt(
+      { name: "AES-GCM", iv: hexToBytes(f.nonce), additionalData: concat("pa-mvp/stream/v1|", this.digest, "|", this.reqNonce, "|", String(f.seq)) },
+      this.key, hexToBytes(f.ciphertext)));
+  }
+
+  async openReceipt(sealed) {
+    try {
+      return JSON.parse(new TextDecoder().decode(await subtle.decrypt(
+        { name: "AES-GCM", iv: hexToBytes(sealed.nonce), additionalData: concat("pa-mvp/receipt/v1|", this.digest, "|", this.reqNonce) },
+        this.key, hexToBytes(sealed.ciphertext))));
+    } catch {
+      return null;
+    }
   }
 
   async open(resp) {
@@ -541,6 +657,10 @@ export function verifierFrom(api, pccsUrl) {
     const v = api.js_verify(quote, col, BigInt(Math.floor(now)));
     return { status: v.status, advisory_ids: v.advisory_ids || [], collateral: col };
   };
+}
+
+export function localQuoteVerifier() {
+  return async () => ({ status: TCB_LOCAL, advisory_ids: [], collateral: null });
 }
 
 let wasmReady = null;
@@ -585,28 +705,33 @@ export async function verifyCvm(base, args) {
   const nonce = randomHex(32);
   const report = await httpJson("GET", `${base}/v1/attestation?nonce=${nonce}`);
   const res = await verifyReport(report, nonce, {
-    quoteVerifier: args.quoteVerifier, requireCompose: true, expectComposeHash: args.expectComposeHash,
-    expectImage: args.expectImage, expectSource: args.expectSource, strictTcb: args.strictTcb,
+    quoteVerifier: args.cvmQuoteVerifier || args.quoteVerifier, collateral: ((report.attestation || {}).evidence || {}).collateral || null,
+    requireCompose: true, expectComposeHash: args.expectComposeHash,
+    expectImage: args.expectImage, expectSource: args.expectSource, strictTcb: args.strictTcb ?? true,
+    strictImage: args.strictImage ?? true, approved: args.approved ?? null,
   });
   res.checks.unshift({ name: "本次随机 nonce（防重放）", status: "INFO", detail: nonce });
   return { res, report, nonce };
 }
 
-export async function chat(base, res, inner, token) {
+export async function chat(base, res, inner, token, extra = {}) {
   const checks = [];
   const key = findE2eeKey(res.keyset);
   if (key === null) return { checks: [{ name: "加密通道", status: "FAIL", detail: "证明里没有本 MVP 的加密公钥" }], out: null };
   const ch = await ClientChannel.create(key, res.keyset_digest);
   const gatewayNonce = randomHex(32);
-  const body = { ...inner, gateway_nonce: gatewayNonce };
+  const body = { ...inner, gateway_nonce: gatewayNonce, sent_at: Date.now() / 1000 };
   if (token) body.access_token = token;
+  if (extra.sessionId) body.session_id = extra.sessionId;
+  if (extra.reverify) body.reverify = true;
+  if (extra.knownNonces) extra.knownNonces.add(gatewayNonce);
   const reqPlain = new TextEncoder().encode(JSON.stringify(body));
   const envelope = await ch.seal(reqPlain);
   const resp = await httpJson("POST", `${base}/v1/chat`, envelope);
   const shown = token ? { ...body, access_token: "*".repeat(8) } : body;
   const trace = { server_key: key, client_public_key: bytesToHex(ch.clientPub), keyset_digest: res.keyset_digest,
                   request: { envelope, plain: shown, size: reqPlain.length, sha256: await sha256Tag(reqPlain) },
-                  response: { envelope: { nonce: resp.nonce, ciphertext: resp.ciphertext } }, receipt: resp.receipt || null };
+                  response: { envelope: { nonce: resp.nonce, ciphertext: resp.ciphertext } }, receipt: null };
   let respPlain;
   try {
     respPlain = await ch.open(resp);
@@ -620,7 +745,8 @@ export async function chat(base, res, inner, token) {
   checks.push({ name: "加密通道：消息用证明里的公钥加密，CVM 解密并加密回复", status: "PASS",
                 detail: `X25519 + AES-256-GCM，公钥 ${key.public_key}` });
   const out = JSON.parse(respText);
-  const receipt = resp.receipt || {};
+  const receipt = (resp.receipt_sealed && (await ch.openReceipt(resp.receipt_sealed))) || {};
+  trace.receipt = receipt;
   checks.push(await verifyReceiptSignature(receipt, res.keyset, res.api_version));
   checks.push(eqCheck("CVM 回执：公钥集摘要一致", receipt.workload_keyset_digest, res.keyset_digest));
   checks.push(eqCheck("CVM 回执：请求哈希 = 我发出的内容", receiptHash(receiptEvent(receipt, "request.received")), await sha256Tag(reqPlain)));
@@ -634,15 +760,32 @@ function b64ToBytes(s) {
   return Uint8Array.from(atob(s || ""), (c) => c.charCodeAt(0));
 }
 
+function minutesAgo(t, now) {
+  return Math.max(0, Math.round((now - t) / 60));
+}
+
+export function upstreamNonce(p, used, current, reused, args) {
+  const now = Math.floor(args.now ?? Date.now() / 1000);
+  if (!reused) return { name: `${p}本次随机数`, status: used === current ? "INFO" : "FAIL", detail: current };
+  const known = Boolean(args.knownNonces && args.knownNonces.has(used));
+  const fresh = Number.isFinite(reused.verified_at) && now - reused.verified_at <= (args.sessionTtl ?? SESSION_TTL) + 60;
+  return { name: `${p}沿用本会话的上游验证`, status: known && fresh ? "INFO" : "FAIL",
+           detail: !known ? `证明里的随机数 ${String(used).slice(0, 16)}… 不是本会话发出过的`
+             : !fresh ? `沿用的验证已超过 ${Math.round((args.sessionTtl ?? SESSION_TTL) / 60)} 分钟`
+             : `沿用 ${minutesAgo(reused.verified_at, now)} 分钟前的验证；证明里的随机数 ${used.slice(0, 16)}… 是本会话之前发出的，下面的检查针对那份证明重新做一遍` };
+}
+
 export async function verifyGateway(out, args) {
   const checks = [];
   if (out.error) return { checks: [{ name: "推理调用", status: "FAIL", detail: out.error }], report: null, trace: null };
   const gw = out.gateway_attestation || {};
+  const gwNonce = out.gateway_nonce || out._gateway_nonce;
+  if (out.reused) checks.push(upstreamNonce("网关 · ", gwNonce, out._gateway_nonce, out.reused, args));
   let gres = null;
   if (!("attestation" in gw)) {
     checks.push({ name: "网关证明", status: "FAIL", detail: `没拿到网关证明：${JSON.stringify(gw)}` });
   } else {
-    gres = await verifyReport(gw, out._gateway_nonce, { label: "网关 · ", quoteVerifier: args.quoteVerifier,
+    gres = await verifyReport(gw, gwNonce, { label: "网关 · ", quoteVerifier: args.quoteVerifier, collateral: out.gateway_collateral || null,
                                                         requireCompose: false, strictTcb: args.strictTcb });
     checks.push(...gres.checks);
     const prov = (gw.attestation || {}).source_provenance || {};
@@ -662,7 +805,11 @@ export async function verifyGateway(out, args) {
                   response: { text: dec.decode(respBytes), size: respBytes.length, sha256: await sha256Tag(respBytes) } };
   let sentMsgs = null;
   try { sentMsgs = JSON.parse(new TextDecoder().decode(reqBytes)).messages ?? null; } catch { sentMsgs = null; }
-  checks.push(eqCheck("CVM 发给网关的就是我的消息（未被改写）", sentMsgs, out._messages));
+  if (args.agent) {
+    const hit = (sentMsgs || []).some((m) => m.role === "user" && JSON.stringify(m.content ?? "").includes(JSON.stringify(args.agent.text || "").slice(1, -1)));
+    checks.push({ name: "agent 发给网关的请求里有我这条消息", status: hit || !args.agent.text ? "PASS" : out.aux ? "INFO" : "WARN",
+                  detail: `${(sentMsgs || []).length} 条消息 · 第 ${out.call ?? 1} 次调用` + (out.aux ? " · 辅助调用" : "") });
+  } else checks.push(eqCheck("CVM 发给网关的就是我的消息（未被改写）", sentMsgs, out._messages));
 
   const receipt = out.receipt;
   if (!receipt) {
@@ -723,6 +870,353 @@ export function provenanceCheck(prov, appCompose) {
   return { name, status: "WARN", detail: `${head}；度量配置里是 ${measured.join(", ")}` };
 }
 
+function tlv(buf, off) {
+  let len = buf[off + 1];
+  let hdr = 2;
+  if (len & 0x80) {
+    const n = len & 0x7f;
+    len = 0;
+    for (let i = 0; i < n; i++) len = len * 256 + buf[off + 2 + i];
+    hdr = 2 + n;
+  }
+  return { tag: buf[off], start: off, body: off + hdr, end: off + hdr + len };
+}
+
+function derChildren(buf, t) {
+  const out = [];
+  for (let o = t.body; o < t.end;) { const c = tlv(buf, o); out.push(c); o = c.end; }
+  return out;
+}
+
+function derTime(der, t) {
+  const s = new TextDecoder().decode(der.slice(t.body, t.end));
+  const y = t.tag === 0x17 ? (Number(s.slice(0, 2)) < 50 ? 2000 : 1900) + Number(s.slice(0, 2)) : Number(s.slice(0, 4));
+  const r = s.slice(t.tag === 0x17 ? 2 : 4);
+  return Date.UTC(y, Number(r.slice(0, 2)) - 1, Number(r.slice(2, 4)), Number(r.slice(4, 6)), Number(r.slice(6, 8)), Number(r.slice(8, 10))) / 1000;
+}
+
+export function parseCert(der) {
+  const [tbs, alg, sig] = derChildren(der, tlv(der, 0));
+  const fields = derChildren(der, tbs);
+  const v = fields[0].tag === 0xa0 ? 1 : 0;
+  const spki = fields[5 + v];
+  const [nb, na] = derChildren(der, fields[3 + v]);
+  const oid = derChildren(der, alg)[0];
+  return { tbs: der.slice(tbs.start, tbs.end), spki: der.slice(spki.start, spki.end), notBefore: derTime(der, nb), notAfter: derTime(der, na),
+           alg: bytesToHex(der.slice(oid.body, oid.end)), sig: der.slice(sig.body + 1, sig.end) };
+}
+
+function ecdsaRaw(sig, n) {
+  const [r, s] = derChildren(sig, tlv(sig, 0));
+  const fix = (t) => {
+    let v = sig.slice(t.body, t.end);
+    while (v.length > n && v[0] === 0) v = v.slice(1);
+    const o = new Uint8Array(n);
+    o.set(v, n - v.length);
+    return o;
+  };
+  return concat(fix(r), fix(s));
+}
+
+const OID_RSA_SHA256 = "2a864886f70d01010b";
+const OID_ECDSA_SHA384 = "2a8648ce3d040303";
+
+async function certIssuedBy(child, parentSpki) {
+  if (child.alg === OID_RSA_SHA256) {
+    const k = await subtle.importKey("spki", parentSpki, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
+    return subtle.verify("RSASSA-PKCS1-v1_5", k, child.sig, child.tbs);
+  }
+  if (child.alg === OID_ECDSA_SHA384) {
+    const k = await subtle.importKey("spki", parentSpki, { name: "ECDSA", namedCurve: "P-384" }, false, ["verify"]);
+    return subtle.verify({ name: "ECDSA", hash: "SHA-384" }, k, ecdsaRaw(child.sig, 48), child.tbs);
+  }
+  throw new Error(`不支持的证书签名算法 ${child.alg}`);
+}
+
+function b64url(s) {
+  return b64ToBytes(String(s).replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (s.length % 4)) % 4));
+}
+
+const jsonOf = (b) => JSON.parse(new TextDecoder().decode(b));
+const asObj = (v) => (typeof v === "string" ? JSON.parse(v) : v);
+
+export async function verifyNrasTokens(nr, nonceHex, models, now) {
+  const tokens = (nr && nr.tokens) || [];
+  if (!tokens.length) throw new Error("没有 NVIDIA 令牌");
+  const claims = [];
+  for (const t of tokens) {
+    const [h, p, s] = t.split(".");
+    const hdr = jsonOf(b64url(h));
+    if (hdr.alg !== "ES384") throw new Error(`令牌算法 ${hdr.alg}`);
+    const x5c = (nr.keys || {})[hdr.kid];
+    if (!x5c) throw new Error(`kid ${hdr.kid} 没有对应证书`);
+    const leaf = parseCert(b64ToBytes(x5c[0]));
+    const inter = parseCert(b64ToBytes(x5c[1]));
+    if (!CHUTES_PINS.nras_intermediates.includes(bytesToHex(await sha256(inter.spki)))) throw new Error("签名证书不在固定的 NVIDIA 中间证书下");
+    if (!(await certIssuedBy(leaf, inter.spki))) throw new Error("签名证书不是 NVIDIA 中间证书签发的");
+    if (!(leaf.notBefore <= now && now <= leaf.notAfter)) throw new Error("签名证书不在有效期内");
+    const key = await subtle.importKey("spki", leaf.spki, { name: "ECDSA", namedCurve: "P-384" }, false, ["verify"]);
+    if (!(await subtle.verify({ name: "ECDSA", hash: "SHA-384" }, key, b64url(s), enc.encode(`${h}.${p}`)))) throw new Error("令牌签名无效");
+    const c = jsonOf(b64url(p));
+    if (!(c.exp > now)) throw new Error("令牌已过期");
+    claims.push(c);
+  }
+  const overall = claims[0];
+  if (overall["x-nvidia-overall-att-result"] !== true) throw new Error("NVIDIA 判定未通过");
+  if (overall.eat_nonce !== nonceHex) throw new Error(`令牌随机数 ${overall.eat_nonce}，应为 ${nonceHex}`);
+  const gpus = claims.slice(1);
+  if (!gpus.length) throw new Error("没有单卡令牌");
+  const listed = Object.values(overall.submods || {}).map((v) => (Array.isArray(v) && v[0] === "DIGEST" && Array.isArray(v[1]) && v[1][0] === "SHA-256" ? v[1][1] : ""));
+  const have = await Promise.all(tokens.slice(1).map(async (t) => bytesToHex(await sha256(enc.encode(t)))));
+  if (listed.length !== have.length || [...listed].sort().join() !== [...have].sort().join()) {
+    throw new Error(`单卡令牌和整体令牌里登记的不一致（登记 ${listed.length} 张，收到 ${have.length} 张）`);
+  }
+  if (gpus.some((c) => c.eat_nonce !== nonceHex)) throw new Error("单卡令牌里的随机数不对");
+  const bad = gpus.filter((c) => !(c.measres === "success" && c.secboot === true && c.dbgstat === "disabled"));
+  const wrong = models ? gpus.filter((c) => !models.has(c.hwmodel)) : [];
+  return { overall, gpus, bad, wrong, tokens: tokens.length };
+}
+
+async function tdxChecks(p, quote, args, now, checks, collateral = null) {
+  const td = parseTdReport(quote);
+  try {
+    const v = await args.quoteVerifier(quote, collateral, now);
+    checks.push({ name: `${p}Intel TDX quote 签名链`, status: TCB_PASS.has(v.status) ? "PASS" : "FAIL", detail: `TCB 状态 ${v.status}` });
+  } catch (e) {
+    checks.push({ name: `${p}Intel TDX quote 签名链`, status: "FAIL", detail: errText(e) });
+  }
+  const debug = Boolean(td.td_attributes[0] & 0x01);
+  checks.push({ name: `${p}非调试模式`, status: debug ? "FAIL" : "PASS", detail: debug ? "调试模式下宿主机可以读内存" : "" });
+  return td;
+}
+
+const regsOf = (td) => ({ mrtd: bytesToHex(td.mr_td), rtmr0: bytesToHex(td.rt_mr0), rtmr1: bytesToHex(td.rt_mr1),
+                          rtmr2: bytesToHex(td.rt_mr2), rtmr3: bytesToHex(td.rt_mr3) });
+
+export function chutesRow(r) {
+  for (const [version, im] of Object.entries(CHUTES_PINS.images)) {
+    if (["mrtd", "rtmr1", "rtmr2", "rtmr3"].every((k) => im[k] === r[k])) {
+      const row = CHUTES_PINS.rows.find((x) => x[0] === version && x[2] === r.rtmr0);
+      if (row) return row;
+    }
+  }
+  return null;
+}
+
+async function gpuChecks(p, nr, nonceHex, models, now, checks) {
+  try {
+    const g = await verifyNrasTokens(nr, nonceHex, models, now);
+    checks.push({ name: `${p}NVIDIA GPU 证明（NRAS）`, status: "PASS",
+                  detail: `${g.tokens} 个令牌签名有效，签名证书链到固定的 NVIDIA 中间证书；随机数 = ${nonceHex.slice(0, 16)}…` });
+    const ok = !g.bad.length && !g.wrong.length;
+    checks.push({ name: `${p}GPU 状态与型号`, status: ok ? "PASS" : "FAIL",
+                  detail: `${g.gpus.length} 块 ${[...new Set(g.gpus.map((c) => c.hwmodel))].join("/")}` +
+                          (g.bad.length ? `；${g.bad.length} 块度量、安全启动或调试状态不对` : "") +
+                          (g.wrong.length ? `；型号 ${g.wrong.map((c) => c.hwmodel).join(",")} 不符` : "") });
+    return g;
+  } catch (e) {
+    checks.push({ name: `${p}NVIDIA GPU 证明（NRAS）`, status: "FAIL", detail: errText(e) });
+    return null;
+  }
+}
+
+function attemptChecks(p, up, checks) {
+  for (const a of up.attempts || []) {
+    checks.push({ name: `${p}跳过未通过验证的实例`, status: "INFO", detail: `${a.instance_id || a.signing_address || ""}：${a.error}` });
+  }
+}
+
+export async function verifyChutes(out, args) {
+  const p = "Chutes · ";
+  const up = out.upstream || {};
+  const now = Math.floor(args.now ?? Date.now() / 1000);
+  const checks = [];
+  checks.push(upstreamNonce(p, up.nonce, out._gateway_nonce, up.reused, args));
+  const nonce = up.reused ? up.nonce : out._gateway_nonce;
+  const trace = { up, nonce, messages: out._messages, model: out.model, reused: up.reused || null };
+  attemptChecks(p, up, checks);
+  if (!up.evidence) {
+    checks.push({ name: `${p}模型机验证`, status: "FAIL", detail: out.error || "没有拿到证据" });
+    return { checks, trace };
+  }
+  const ev = up.evidence;
+  const body = b64ToBytes(ev.attested_body);
+  const cert = parseCert(b64ToBytes(ev.certificate));
+  trace.cert_spki_sha256 = bytesToHex(await sha256(cert.spki));
+  try {
+    const k = await subtle.importKey("spki", cert.spki, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
+    const ok = await subtle.verify("RSASSA-PKCS1-v1_5", k, b64ToBytes(ev.signature), body);
+    checks.push({ name: `${p}证据签名（实例证书）`, status: ok ? "PASS" : "FAIL", detail: ok ? `RSA-PKCS1v15-SHA256，${body.length} B 原始响应` : "签名无效" });
+  } catch (e) {
+    checks.push({ name: `${p}证据签名（实例证书）`, status: "FAIL", detail: errText(e) });
+  }
+  const doc = jsonOf(body);
+  trace.doc = doc;
+  checks.push(doc.nonce === undefined
+    ? { name: `${p}证据里的随机数是本次的`, status: "PASS", detail: "旧格式证据无此字段，由 report_data 绑定" }
+    : eqCheck(`${p}证据里的随机数是本次的`, doc.nonce, nonce));
+  const quote = b64ToBytes((doc.evidence || {}).tdx_quote || (doc.evidence || {}).quote);
+  trace.quote = bytesToHex(quote);
+  const td = await tdxChecks(p, quote, args, now, checks, up.collateral || null);
+  const rd = bytesToHex(td.report_data);
+  trace.report_data = rd;
+  checks.push(eqCheck(`${p}quote 绑定实例证书（report_data[32:64]）`, rd.slice(64), trace.cert_spki_sha256));
+  const want = bytesToHex(await sha256(nonce + up.e2e_pubkey));
+  trace.binding = { nonce, e2e_pubkey: up.e2e_pubkey, expected: want, actual: rd.slice(0, 64) };
+  checks.push(eqCheck(`${p}quote 绑定本次随机数和加密公钥（report_data[0:32]）`, rd.slice(0, 64), want));
+  const r = regsOf(td);
+  const row = chutesRow(r);
+  trace.regs = r;
+  trace.row = row;
+  checks.push({ name: `${p}度量值命中参考值快照（MRTD、RTMR0-3）`, status: row ? "PASS" : "FAIL",
+                detail: row ? `Chutes ${row[0]} · ${row[1]}` : `MRTD ${r.mrtd.slice(0, 16)}… 不在 ${CHUTES_PINS.fetched} 的快照里` });
+  const gpu = asObj((doc.evidence || {}).nvtrust_evidence) || [];
+  trace.gpu_count = gpu.length;
+  if (!gpu.length) checks.push({ name: `${p}GPU 数量`, status: "FAIL", detail: "证据里没有 GPU" });
+  else if (row && gpu.length > row[4]) checks.push({ name: `${p}GPU 数量`, status: "FAIL", detail: `${gpu.length} 块，参考值最多 ${row[4]} 块` });
+  const models = row ? new Set(row[3].flatMap((g) => CHUTES_PINS.gpu_models[g] || [])) : new Set();
+  trace.nras = await gpuChecks(p, up.nras, rd.slice(0, 64), models, now, checks);
+  if (args.agent) {
+    checks.push({ name: `${p}agent 发给模型的请求`, status: "INFO",
+                  detail: `${(up.request || {}).messages ?? "?"} 条消息 · ${(up.request || {}).tools ?? 0} 个工具 · 整体加密` });
+  } else checks.push(eqCheck(`${p}CVM 发出的就是我的消息`, (up.request || {}).messages ?? null, out._messages));
+  const okReply = !out.error && (args.agent ? Boolean(up.response) : typeof out.reply === "string");
+  checks.push({ name: `${p}加密发送，只有这台实例能解开`, status: okReply ? "PASS" : "FAIL",
+                detail: okReply ? `ML-KEM-768 + ChaCha20-Poly1305 · 请求 ${up.request_ciphertext_bytes} B · 回复 ${up.response_ciphertext_bytes} B` +
+                                  (up.stream_chunks ? ` · 流式 ${up.stream_chunks} 块` : "")
+                  : out.error || "没有回复" });
+  return { checks, trace };
+}
+
+function hexOrB64(s) {
+  const t = String(s || "").replace(/^0x/, "");
+  return /^(?:[0-9a-fA-F]{2})+$/.test(t) ? hexToBytes(t) : b64ToBytes(t);
+}
+
+export async function verifyNear(out, args) {
+  const p = "NEAR · ";
+  const up = out.upstream || {};
+  const now = Math.floor(args.now ?? Date.now() / 1000);
+  const checks = [];
+  checks.push(upstreamNonce(p, up.nonce, out._gateway_nonce, up.reused, args));
+  const nonce = up.reused ? up.nonce : out._gateway_nonce;
+  const trace = { up, nonce, messages: out._messages, model: out.model, reused: up.reused || null };
+  attemptChecks(p, up, checks);
+  const att = up.attestation;
+  if (!att) {
+    checks.push({ name: `${p}模型机验证`, status: "FAIL", detail: out.error || "没有拿到证明" });
+    return { checks, trace };
+  }
+  const quote = hexOrB64(att.intel_quote);
+  trace.quote = bytesToHex(quote);
+  const td = await tdxChecks(p, quote, args, now, checks, up.collateral || null);
+  const rd = bytesToHex(td.report_data);
+  const key = String(att.signing_address || "").replace(/^0x/, "").toLowerCase();
+  trace.report_data = rd;
+  trace.key = key;
+  checks.push(eqCheck(`${p}quote 绑定模型公钥（report_data[0:32]）`, rd.slice(0, 64), key));
+  checks.push(eqCheck(`${p}quote 绑定本次随机数（report_data[32:64]）`, rd.slice(64), nonce));
+  const info = asObj(att.info) || {};
+  const tcbInfo = asObj(info.tcb_info) || {};
+  const compose = tcbInfo.app_compose || "";
+  let named = {};
+  try {
+    const events = parseEventLog(att.event_log);
+    const rep = await replayRtmr3(events);
+    named = rep.named;
+    trace.events = events;
+    trace.replay = { steps: rep.steps, result: bytesToHex(rep.mr), quote: bytesToHex(td.rt_mr3) };
+    checks.push({ name: `${p}事件日志重放 = quote 中的 RTMR3`, status: !rep.errors.length && bytesEqual(rep.mr, td.rt_mr3) ? "PASS" : "FAIL",
+                  detail: rep.errors.length ? rep.errors.slice(0, 2).join("；") : `${rep.steps.length} 条运行时事件` });
+  } catch (e) {
+    checks.push({ name: `${p}事件日志重放 = quote 中的 RTMR3`, status: "FAIL", detail: errText(e) });
+  }
+  const ch = bytesToHex(await sha256(compose));
+  const only = (k) => ((named[k] || []).length === 1 ? named[k][0] : null);
+  trace.compose = { raw: compose, sha256: ch, measured: only("compose-hash") };
+  checks.push(eqCheck(`${p}部署配置哈希：sha256(app_compose) = 度量值`, only("compose-hash"), ch));
+  try { trace.app_compose = JSON.parse(compose); } catch { trace.app_compose = null; }
+  trace.regs = regsOf(td);
+  const r = trace.regs;
+  const imageOk = NEAR_PINS.mrtd.includes(r.mrtd) && r.rtmr1 === NEAR_PINS.rtmr1 && r.rtmr2 === NEAR_PINS.rtmr2;
+  checks.push({ name: `${p}系统镜像与虚拟硬件（MRTD、RTMR0-2）`, status: imageOk && NEAR_PINS.rtmr0.includes(r.rtmr0) ? "PASS" : "FAIL",
+                detail: imageOk ? `${NEAR_PINS.image} · MRTD/RTMR1 与官方 0.5.12 一致 · RTMR2/RTMR0 为 ${NEAR_PINS.observed} 实测` +
+                                  (NEAR_PINS.rtmr0.includes(r.rtmr0) ? "" : `；RTMR0 ${r.rtmr0.slice(0, 16)}… 不在参考值里`)
+                  : `不是固定的 ${NEAR_PINS.image}` });
+  checks.push(eqCheck(`${p}os-image-hash 与参考值一致`, only("os-image-hash"), NEAR_PINS.os_image_hash));
+  let kms = null;
+  try { kms = JSON.parse(new TextDecoder().decode(hexToBytes(only("key-provider")))).id ?? null; } catch { kms = null; }
+  trace.kms = kms;
+  checks.push({ name: `${p}密钥来自固定的 NEAR KMS（key-provider）`, status: kms === NEAR_PINS.kms ? "PASS" : "FAIL",
+                detail: kms === NEAR_PINS.kms ? `KMS 公钥 ${kms.slice(-32)}` : `key-provider ${kms ?? "缺失"}` });
+  const appId = only("app-id");
+  trace.app_id = appId;
+  trace.instance_id = only("instance-id");
+  checks.push({ name: `${p}模型公钥由同一应用的多台机器共用`, status: "WARN",
+                detail: `同一 app-id 的机器共用这把公钥，本次验证 ${(trace.instance_id || "?").slice(0, 12)}…，已固定 ${NEAR_PINS.compose_hashes.length} 台配置` });
+  const pinned = NEAR_PINS.app_ids.includes(appId) && NEAR_PINS.compose_hashes.includes(ch);
+  checks.push({ name: `${p}app-id 和部署配置是固定的那一份`, status: pinned ? "PASS" : "FAIL",
+                detail: `app-id ${appId ?? "缺失"}，compose-hash ${ch.slice(0, 16)}…` + (pinned ? "" : "，不在参考值里") });
+  const cm = asObj(att.compose_manager_attestation);
+  if (!cm) checks.push({ name: `${p}部署日志（compose-manager）`, status: "FAIL", detail: "缺少部署日志" });
+  else {
+    const cq = hexOrB64(cm.quote);
+    const ctd = await tdxChecks(`${p}部署日志 · `, cq, args, now, checks, up.cm_collateral || null);
+    trace.cm = cm;
+    trace.cm_quote = bytesToHex(cq);
+    checks.push(eqCheck(`${p}部署日志和模型在同一台机器（MRTD、RTMR0-3）`, regsOf(ctd), trace.regs));
+    const ah = bytesToHex(await sha256(jcs(cm.actions || [])));
+    const crd = bytesToHex(ctd.report_data);
+    checks.push({ name: `${p}部署日志哈希绑定在 quote 里`, status: ah === cm.actions_hash && crd.slice(0, 64) === ah && crd.slice(64) === nonce ? "PASS" : "FAIL",
+                  detail: `sha256(JCS(actions)) ${ah.slice(0, 16)}…，${(cm.actions || []).length} 条动作，随机数${crd.slice(64) === nonce ? "是本次的" : "不对"}` });
+    const ups = (cm.actions || []).filter((a) => a.action === "compose_up");
+    const last = ups[ups.length - 1] || {};
+    trace.deploys = ups;
+    checks.push({ name: `${p}模型代码由 compose-manager 运行时部署，不在硬件度量里`, status: "WARN",
+                  detail: `${ups.length} 次部署 · 最近 ${last.tag ?? "?"} @ ${(last.commit || "?").slice(0, 7)} · ${last.file ?? "?"} · ${last.timestamp ?? ""}` });
+  }
+  const nv = asObj(att.nvidia_payload) || {};
+  checks.push(eqCheck(`${p}GPU 证据用的是本次随机数`, String(nv.nonce || "").toLowerCase(), nonce));
+  trace.nras = await gpuChecks(p, up.nras, nonce, null, now, checks);
+  if (out.error || typeof out.reply !== "string") {
+    checks.push({ name: `${p}加密发送`, status: "FAIL", detail: out.error || "没有回复" });
+    return { checks, trace };
+  }
+  checks.push({ name: `${p}加密发送，只有这台模型机能解开`, status: "PASS",
+                detail: "XChaCha20-Poly1305 第 3 版 · 消息、工具定义、工具调用逐字段加密 · 网关可见模型名、参数和消息条数" });
+  const reqBytes = b64ToBytes(up.request_b64);
+  const respBytes = b64ToBytes(up.response_b64);
+  trace.request = { text: new TextDecoder().decode(reqBytes), sha256: bytesToHex(await sha256(reqBytes)) };
+  trace.response = { text: new TextDecoder().decode(respBytes), sha256: bytesToHex(await sha256(respBytes)) };
+  if (args.agent) {
+    checks.push({ name: `${p}agent 发给模型的请求`, status: "INFO", detail: `${up.plain_messages ?? "?"} 条消息 · 逐字段加密` });
+  } else checks.push(eqCheck(`${p}CVM 发出的就是我的消息`, up.plain_messages ?? null, out._messages));
+  const sig = up.signature;
+  trace.signature = sig || null;
+  if (!sig) {
+    checks.push({ name: `${p}回复签名（模型机密钥）`, status: "FAIL", detail: "没取到签名" });
+    return { checks, trace };
+  }
+  const parts = String(sig.text || "").split(":");
+  const [reqHash, respHash] = parts.slice(-2);
+  let valid = false;
+  try {
+    const k = await subtle.importKey("raw", hexToBytes(String(sig.signing_address).replace(/^0x/, "")), { name: "Ed25519" }, false, ["verify"]);
+    valid = await subtle.verify({ name: "Ed25519" }, k, hexOrB64(sig.signature), enc.encode(sig.text));
+  } catch { valid = false; }
+  const signer = String(sig.signing_address || "").replace(/^0x/, "").toLowerCase() === key;
+  const kind = sig.signature_kind === "provider_tee";
+  const model = parts.length === 3 && parts[0] === out.model;
+  checks.push({ name: `${p}回复签名（模型机密钥）`, status: valid && signer && kind && model ? "PASS" : "FAIL",
+                detail: `${valid ? "Ed25519 签名有效" : "签名无效"}；签名者${signer ? "是" : "不是"}刚验证的模型公钥；类型 ${sig.signature_kind ?? "未标注"}` +
+                        `${kind ? "（模型机 TEE 签名）" : "（不是模型机签的）"}；签名里的模型 ${parts.length === 3 ? parts[0] : "缺失"}${model ? "" : "，和请求的不一致"}` });
+  checks.push({ name: `${p}签名覆盖的请求 = CVM 发出的字节`, status: reqHash === trace.request.sha256 ? "PASS" : "FAIL",
+                detail: "请求哈希由 NEAR 网关提供" });
+  checks.push({ name: `${p}签名覆盖的回复 = CVM 收到的字节`, status: respHash === trace.response.sha256 ? "PASS" : "FAIL",
+                detail: respHash === trace.response.sha256 ? "" : "回复被改写过" });
+  return { checks, trace };
+}
+
 export async function tamperDemo(report, nonce, res, args) {
   const firstFail = async (rep, n, needle) => {
     const r = await verifyReport(rep, n, { quoteVerifier: args.quoteVerifier, collateral: res.collateral, requireCompose: true });
@@ -777,53 +1271,318 @@ function infoChecks(m) {
   ];
 }
 
+export function bytesToB64(bytes) {
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+export async function* agentStream(base, res, inner, token, extra = {}) {
+  const key = findE2eeKey(res.keyset);
+  if (key === null) throw new Error("证明里没有本 MVP 的加密公钥");
+  const ch = await ClientChannel.create(key, res.keyset_digest);
+  const gatewayNonce = randomHex(32);
+  const body = { ...inner, gateway_nonce: gatewayNonce, sent_at: Date.now() / 1000 };
+  if (token) body.access_token = token;
+  if (extra.sessionId) body.session_id = extra.sessionId;
+  if (extra.reverify) body.reverify = true;
+  if (extra.knownNonces) extra.knownNonces.add(gatewayNonce);
+  const reqPlain = enc.encode(JSON.stringify(body));
+  const envelope = await ch.seal(reqPlain, true);
+  let r;
+  try {
+    r = await fetch(`${base}/v1/chat/stream`, { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" },
+                                                 body: JSON.stringify(envelope) });
+  } catch {
+    throw new ServiceError("连接失败");
+  }
+  if (!r.ok) throw new ServiceError(`HTTP ${r.status}`);
+  yield ["sent", { gatewayNonce }];
+  const reader = r.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  const plains = [];
+  let done = null;
+  let broken = null;
+  for (;;) {
+    const { value, done: end } = await reader.read();
+    if (value) buf += dec.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf("\n\n")) >= 0) {
+      const block = buf.slice(0, i);
+      buf = buf.slice(i + 2);
+      const line = block.split("\n").find((l) => l.startsWith("data:"));
+      if (!line) continue;
+      const f = JSON.parse(line.slice(5));
+      if (f.done) { done = f; continue; }
+      if (f.seq !== plains.length) { broken = `第 ${plains.length} 帧缺失或乱序`; continue; }
+      let pt;
+      try { pt = await ch.openFrame(f); } catch { broken = `第 ${f.seq} 帧解密失败`; continue; }
+      plains.push(pt);
+      yield ["event", JSON.parse(new TextDecoder().decode(pt))];
+    }
+    if (end) break;
+  }
+  const joined = concat(...plains.flatMap((p, k) => (k ? [enc.encode("\n"), p] : [p])));
+  const checks = [];
+  checks.push({ name: "加密流：每帧单独加密，序号连续", status: !broken && done && done.frames === plains.length ? "PASS" : "FAIL",
+                detail: broken || (!done ? "流在结尾回执之前中断" : `${plains.length} 帧 · AES-256-GCM`) });
+  const receipt = (done && done.receipt_sealed && (await ch.openReceipt(done.receipt_sealed))) || {};
+  checks.push(await verifyReceiptSignature(receipt, res.keyset, res.api_version));
+  checks.push(eqCheck("CVM 回执：请求哈希 = 我发出的内容", receiptHash(receiptEvent(receipt, "request.received")), await sha256Tag(reqPlain)));
+  checks.push(eqCheck("CVM 回执：流式回复哈希 = 我收到的全部帧", receiptHash(receiptEvent(receipt, "response.returned")), await sha256Tag(joined)));
+  const shown = token ? { ...body, access_token: "*".repeat(8) } : body;
+  for (const a of shown.attachments || []) a.data = `${(a.data || "").length} 个 base64 字符`;
+  const trace = { server_key: key, client_public_key: bytesToHex(ch.clientPub), keyset_digest: res.keyset_digest, receipt,
+                  request: { envelope: { ...envelope, ciphertext_b64: `${envelope.ciphertext_b64.length} 个 base64 字符` }, plain: shown,
+                             size: reqPlain.length, sha256: await sha256Tag(reqPlain) },
+                  response: { frames: plains.length, size: joined.length, sha256: await sha256Tag(joined) } };
+  yield ["checks", { checks, trace, gatewayNonce }];
+}
+
+export async function* runAgent(base, args) {
+  const t0 = Date.now() / 1000;
+  let session = args.session || null;
+  const all = [];
+  const result = { url: base, verified_at: Math.floor(t0), agent: true, provider: args.provider, model: args.model };
+  const context = { report: null, nonce: null, res: null, channel: null, gateway: null, upstream: null, fresh: false, session: null, agent: null };
+  const extra = { sessionId: args.sessionId, reverify: Boolean(args.reverify), knownNonces: args.knownNonces };
+  const inner = { agent: "turn", input: args.input, attachments: args.attachments || [], provider: args.provider, model: args.model,
+                  ...(args.chat && args.chat !== "default" ? { chat: args.chat } : {}) };
+  let blocked = false;
+  let upstream = null;
+  const outbound = [];
+  let turnNonce = null;
+  let streamed = false;
+  for (let attempt = 0; attempt < 2 && !streamed && !blocked; attempt++) {
+    let res, report, nonce;
+    if (session) {
+      ({ res, report, nonce } = session);
+      const reuse = [{ name: "沿用本会话的 CVM 验证", status: "INFO",
+                       detail: `#${session.recId} · ${new Date(session.verifiedAt * 1000).toLocaleTimeString("zh-CN", { hour12: false })}` +
+                               ` · ${minutesAgo(session.verifiedAt, t0)} 分钟前` }];
+      yield ["section", ["cvm", reuse]];
+      context.session = { recId: session.recId, verifiedAt: session.verifiedAt };
+      result.cvm = reuse;
+    } else {
+      yield ["stage", "cvm"];
+      ({ res, report, nonce } = await verifyCvm(base, args));
+      yield ["section", ["cvm", res.checks]];
+      const info = infoChecks(res.measurements);
+      if (info.length) yield ["section", ["info", info]];
+      all.push(...res.checks);
+      result.cvm = res.checks;
+      context.fresh = true;
+      if (res.failed.length) {
+        blocked = true;
+        yield ["blocked", "证明未通过，未发送"];
+      }
+    }
+    Object.assign(context, { report, nonce, res });
+    result.measurements = res.measurements;
+    result.raw_attestation = report;
+    if (blocked) break;
+    yield ["stage", "channel"];
+    try {
+      for await (const [kind, data] of agentStream(base, res, inner, args.token, extra)) {
+        if (kind === "sent") { turnNonce = data.gatewayNonce; streamed = true; }
+        else if (kind === "event") {
+          if (data.type === "upstream") upstream = data;
+          if (data.type === "tool.started" && /^(web_|browser_)/.test(data.tool_name || "")) outbound.push(data);
+          yield ["agent", data];
+        } else if (kind === "checks") {
+          context.channel = data.trace;
+          yield ["section", ["channel", data.checks]];
+          all.push(...data.checks);
+          result.channel = data.checks;
+        }
+      }
+    } catch (e) {
+      if (session && !streamed && e instanceof ServiceError && e.message === "HTTP 400") {
+        session = null;
+        context.session = null;
+        extra.reverify = true;
+        yield ["renew", "CVM 公钥已变，重新验证"];
+        continue;
+      }
+      throw e;
+    }
+  }
+  if (streamed) {
+    yield ["stage", "gateway"];
+    const p = args.provider;
+    const label = { phala: "网关 · ", chutes: "Chutes · ", near: "NEAR · " }[p];
+    const checks = [];
+    const ev = upstream && upstream.evidence ? upstream.evidence[p] : null;
+    const calls = (upstream && upstream.calls) || [];
+    if (!ev) checks.push({ name: `${label}模型机验证`, status: "FAIL", detail: "本轮没有成功的模型调用" });
+    else {
+      const out = { ...ev, _gateway_nonce: turnNonce, _messages: null };
+      const vargs = { ...args, agent: { text: args.input } };
+      if (p === "phala") {
+        const r = await verifyGateway(out, vargs);
+        checks.push(...r.checks);
+        context.gateway = { nonce: out.gateway_nonce || turnNonce, report: r.report, model: out.model ?? null, trace: r.trace };
+      } else {
+        const r = await (p === "chutes" ? verifyChutes : verifyNear)(out, vargs);
+        checks.push(...r.checks);
+        context.upstream = { provider: p, model: out.model ?? null, trace: r.trace };
+      }
+    }
+    const proof = (c) => {
+      const v = c.verified || {};
+      if (c.provider === "phala") return `回执 ${v.receipt_id ?? "?"} 验签通过 · 哈希一致 · 上游会话 ${v.upstream_session ?? "?"}`;
+      if (c.provider === "chutes") return `实例 ${String(v.instance_id ?? "?").slice(0, 8)}… · ${v.e2e ?? ""}` +
+                                         (v.stream_chunks ? ` · ${v.stream_chunks} 块` : "");
+      return `模型机签名有效 · ${String(v.signing_address ?? "?").slice(0, 12)}…`;
+    };
+    calls.forEach((c, i) => checks.push({ name: `${label}模型调用 #${i + 1}`,
+      status: c.ok && c.verified ? "PASS" : c.ok ? "FAIL" : c.aux || calls.slice(i + 1).some((d) => d.ok) ? "WARN" : "FAIL",
+      detail: `${c.provider}/${c.model}${c.aux ? " · 辅助调用" : ""} · ${c.reused ? "沿用验证" : "完整验证"} · ${c.seconds}s` +
+              (c.ok && c.verified ? ` · ${proof(c)}` : c.ok ? " · 无核对结果" : "") +
+              (c.tool_calls && c.tool_calls.length ? ` · 工具 ${c.tool_calls.join("、")}` : "") +
+              (c.error ? ` · ${c.error}` + (calls.slice(i + 1).some((d) => d.ok) ? " · 已重试" : "") : "") }));
+    if (upstream) checks.push(...netChecks(upstream, outbound, calls));
+    context.agent = { calls, provider: p, model: args.model, outbound, egress: upstream ? upstream.egress || [] : [] };
+    yield ["section", ["gateway", checks]];
+    all.push(...checks);
+    result.gateway = checks;
+    result.upstream_evidence = upstream ? upstream.evidence : null;
+  }
+  const counts = { PASS: 0, WARN: 0, FAIL: 0 };
+  for (const c of all) if (c.status in counts) counts[c.status]++;
+  yield ["done", { counts, elapsed: Date.now() / 1000 - t0, result, blocked, context }];
+}
+
+export function netChecks(up, outbound, calls) {
+  const egress = up.egress || [];
+  const hosts = (list) => Object.entries(list.reduce((m, e) => ({ ...m, [e.host]: (m[e.host] || 0) + 1 }), {}))
+    .map(([h, n]) => (n > 1 ? `${h} ×${n}` : h)).join("、");
+  const out = [];
+  if (!up.egress_port) {
+    out.push({ name: "联网开关", status: "WARN", detail: "未启用外网出口，开关不生效" });
+    return out;
+  }
+  const removed = [...new Set(calls.flatMap((c) => c.net_tools_removed || []))];
+  const denied = egress.filter((e) => !e.allowed);
+  const shared = Math.max(0, ...egress.map((e) => e.shared || 0));
+  const others = shared > 1 ? ` · 同时有 ${shared} 个会话在运行，无法区分来源` : "";
+  const changed = up.internet_now !== undefined && up.internet_now !== up.internet ? ` · 中途切换为${up.internet_now ? "开启" : "关闭"}` : "";
+  const leaked = egress.filter((e) => e.allowed);
+  if (up.internet === false && leaked.length) {
+    out.push({ name: "联网开关：已关闭，CVM 出口拒绝外网连接", status: "FAIL",
+               detail: `关闭期间放行 ${leaked.length} 次：${hosts(leaked)}` + changed + others });
+  } else if (up.internet === false) {
+    out.push({ name: "联网开关：已关闭，CVM 出口拒绝外网连接", status: changed ? "WARN" : "PASS",
+               detail: `拒绝 ${denied.length} 次${denied.length ? `（${hosts(denied)}）` : ""}` +
+                       (removed.length ? ` · 已移除 ${removed.join("、")}` : "") +
+                       changed + others });
+  } else {
+    const allowed = egress.filter((e) => e.allowed);
+    const tools = outbound.map((t) => `${t.tool_name} ${String(t.preview || "").slice(0, 100)}`);
+    out.push(allowed.length
+      ? { name: "agent 联网：这些请求离开了 TEE", status: "WARN",
+          detail: `访问 ${hosts(allowed)}` + (tools.length ? ` · ${tools.join("；")}` : "") + changed + others }
+      : { name: "联网开关：已开启", status: "INFO", detail: "无外网访问" + changed });
+  }
+  if (!up.isolated) {
+    out.push({ name: "出口隔离", status: "WARN", detail: "本地调试：容器可以绕过出口直连外网" });
+  }
+  return out;
+}
+
 export async function* run(base, args) {
   const t0 = Date.now() / 1000;
-  yield ["stage", "cvm"];
-  const { res, report, nonce } = await verifyCvm(base, args);
-  yield ["section", ["cvm", res.checks]];
-  const m = res.measurements;
-  const info = infoChecks(m);
-  if (info.length) yield ["section", ["info", info]];
-
-  const result = { url: base, verified_at: Math.floor(t0), cvm: res.checks, measurements: m };
-  const all = [...res.checks];
-  const context = { report, nonce, res, channel: null, gateway: null };
+  let session = !args.authOnly && args.session ? args.session : null;
+  const result = { url: base, verified_at: Math.floor(t0) };
+  const all = [];
+  const context = { report: null, nonce: null, res: null, channel: null, gateway: null, upstream: null, fresh: false, session: null };
+  const extra = { sessionId: args.sessionId, reverify: Boolean(args.reverify), knownNonces: args.knownNonces };
+  const inner = args.authOnly ? { auth_only: true } : { messages: args.messages, provider: args.provider || "phala" };
   let blocked = false;
-  if (res.failed.length) {
-    blocked = true;
-    yield ["blocked", "证明验证未通过，不发送消息。"];
-  } else {
-    yield ["stage", "channel"];
-    const inner = args.authOnly ? { auth_only: true } : { messages: args.messages };
-    const { checks: cchecks, out, trace: ctrace } = await chat(base, res, inner, args.token);
-    context.channel = ctrace;
-    yield ["section", ["channel", cchecks]];
-    all.push(...cchecks);
-    result.channel = cchecks;
-    if (out !== null) {
-      if (args.authOnly) {
-        yield ["auth", { ok: out.ok === true, mode: out.mode ?? null, error: out.error ?? null }];
-      } else {
-        if (out.mode === "phala") {
-          yield ["stage", "gateway"];
-          const { checks: gchecks, report: gres, trace: gtrace } = await verifyGateway(out, args);
-          context.gateway = { nonce: out._gateway_nonce, report: gres, model: out.model ?? null, trace: gtrace };
-          yield ["section", ["gateway", gchecks]];
-          all.push(...gchecks);
-          result.gateway = gchecks;
-          result.gateway_receipt = out.receipt ?? null;
-        } else if (out.error) {
-          yield ["error", out.error];
-        }
-        yield ["reply", { text: out.reply ?? null, mode: out.mode ?? null, model: out.model ?? null }];
-        result.reply = out.reply ?? null;
-        result.mode = out.mode ?? null;
+  let out = null;
+  for (let attempt = 0; attempt < 2 && out === null && !blocked; attempt++) {
+    let res, report, nonce;
+    if (session) {
+      ({ res, report, nonce } = session);
+      const reuse = [{ name: "沿用本会话的 CVM 验证", status: "INFO",
+                       detail: `#${session.recId} · ${new Date(session.verifiedAt * 1000).toLocaleTimeString("zh-CN", { hour12: false })}` +
+                               ` · ${minutesAgo(session.verifiedAt, t0)} 分钟前` }];
+      yield ["section", ["cvm", reuse]];
+      context.session = { recId: session.recId, verifiedAt: session.verifiedAt };
+      result.cvm = reuse;
+      result.reused_session = session.recId;
+    } else {
+      yield ["stage", "cvm"];
+      ({ res, report, nonce } = await verifyCvm(base, args));
+      yield ["section", ["cvm", res.checks]];
+      const info = infoChecks(res.measurements);
+      if (info.length) yield ["section", ["info", info]];
+      all.push(...res.checks);
+      result.cvm = res.checks;
+      context.fresh = true;
+      if (res.failed.length) {
+        blocked = true;
+        yield ["blocked", "证明未通过，未发送"];
       }
+    }
+    Object.assign(context, { report, nonce, res });
+    result.measurements = res.measurements;
+    result.raw_attestation = report;
+    if (blocked) break;
+    yield ["stage", "channel"];
+    let r;
+    try {
+      r = await chat(base, res, inner, args.token, extra);
+    } catch (e) {
+      if (session && e instanceof ServiceError && e.message === "HTTP 400") {
+        session = null;
+        context.session = null;
+        extra.reverify = true;
+        yield ["renew", "CVM 公钥已变，重新验证"];
+        continue;
+      }
+      throw e;
+    }
+    context.channel = r.trace;
+    yield ["section", ["channel", r.checks]];
+    all.push(...r.checks);
+    result.channel = r.checks;
+    out = r.out;
+    if (out === null) break;
+  }
+  if (out !== null) {
+    if (args.authOnly) {
+      yield ["auth", { ok: out.ok === true, mode: out.mode ?? null, error: out.error ?? null, providers: out.providers ?? null,
+                        models: out.models ?? null, agent: out.agent === true }];
+    } else {
+      if (out.mode === "phala") {
+        yield ["stage", "gateway"];
+        const { checks: gchecks, report: gres, trace: gtrace } = await verifyGateway(out, args);
+        context.gateway = { nonce: out.gateway_nonce || out._gateway_nonce, report: gres, model: out.model ?? null, trace: gtrace };
+        yield ["section", ["gateway", gchecks]];
+        all.push(...gchecks);
+        result.gateway = gchecks;
+        result.gateway_receipt = out.receipt ?? null;
+      } else if (out.mode === "chutes" || out.mode === "near") {
+        yield ["stage", "gateway"];
+        const { checks: uchecks, trace: utrace } = await (out.mode === "chutes" ? verifyChutes : verifyNear)(out, args);
+        context.upstream = { provider: out.mode, model: out.model ?? null, trace: utrace };
+        yield ["section", ["gateway", uchecks]];
+        all.push(...uchecks);
+        result.gateway = uchecks;
+        result.upstream_evidence = out.upstream ?? null;
+        if (out.error) yield ["error", out.error];
+      } else if (out.error) {
+        yield ["error", out.error];
+      }
+      yield ["reply", { text: out.reply ?? null, mode: out.mode ?? null, model: out.model ?? null }];
+      result.reply = out.reply ?? null;
+      result.mode = out.mode ?? null;
+      result.model = out.model ?? null;
     }
   }
   const counts = { PASS: 0, WARN: 0, FAIL: 0 };
   for (const c of all) if (c.status in counts) counts[c.status]++;
-  result.raw_attestation = report;
   yield ["done", { counts, elapsed: Date.now() / 1000 - t0, result, blocked, context }];
 }
