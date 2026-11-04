@@ -630,7 +630,7 @@ export class ClientChannel {
     try {
       return new Uint8Array(await subtle.decrypt(
         { name: "AES-GCM", iv: hexToBytes(resp.nonce), additionalData: concat("pa-mvp/resp/v1|", this.digest, "|", this.reqNonce) },
-        this.key, hexToBytes(resp.ciphertext)));
+        this.key, resp.ciphertext_b64 !== undefined ? b64ToBytes(resp.ciphertext_b64) : hexToBytes(resp.ciphertext)));
     } catch {
       throw new Error("解密失败");
     }
@@ -726,12 +726,12 @@ export async function chat(base, res, inner, token, extra = {}) {
   if (extra.reverify) body.reverify = true;
   if (extra.knownNonces) extra.knownNonces.add(gatewayNonce);
   const reqPlain = new TextEncoder().encode(JSON.stringify(body));
-  const envelope = await ch.seal(reqPlain);
+  const envelope = await ch.seal(reqPlain, Boolean(extra.b64));
   const resp = await httpJson("POST", `${base}/v1/chat`, envelope);
   const shown = token ? { ...body, access_token: "*".repeat(8) } : body;
   const trace = { server_key: key, client_public_key: bytesToHex(ch.clientPub), keyset_digest: res.keyset_digest,
                   request: { envelope, plain: shown, size: reqPlain.length, sha256: await sha256Tag(reqPlain) },
-                  response: { envelope: { nonce: resp.nonce, ciphertext: resp.ciphertext } }, receipt: null };
+                  response: { envelope: { nonce: resp.nonce, ciphertext: resp.ciphertext ?? resp.ciphertext_b64 } }, receipt: null };
   let respPlain;
   try {
     respPlain = await ch.open(resp);
@@ -756,7 +756,7 @@ export async function chat(base, res, inner, token, extra = {}) {
   return { checks, out, trace };
 }
 
-function b64ToBytes(s) {
+export function b64ToBytes(s) {
   return Uint8Array.from(atob(s || ""), (c) => c.charCodeAt(0));
 }
 
@@ -1332,7 +1332,8 @@ export async function* agentStream(base, res, inner, token, extra = {}) {
   checks.push(eqCheck("CVM 回执：请求哈希 = 我发出的内容", receiptHash(receiptEvent(receipt, "request.received")), await sha256Tag(reqPlain)));
   checks.push(eqCheck("CVM 回执：流式回复哈希 = 我收到的全部帧", receiptHash(receiptEvent(receipt, "response.returned")), await sha256Tag(joined)));
   const shown = token ? { ...body, access_token: "*".repeat(8) } : body;
-  for (const a of shown.attachments || []) a.data = `${(a.data || "").length} 个 base64 字符`;
+  shown.attachments = (shown.attachments || []).map((a) => ({ ...a, data: `${(a.data || "").length} 个 base64 字符`,
+                                                              ...(a.thumb ? { thumb: `缩略图 ${a.thumb.length} 字符` } : {}) }));
   const trace = { server_key: key, client_public_key: bytesToHex(ch.clientPub), keyset_digest: res.keyset_digest, receipt,
                   request: { envelope: { ...envelope, ciphertext_b64: `${envelope.ciphertext_b64.length} 个 base64 字符` }, plain: shown,
                              size: reqPlain.length, sha256: await sha256Tag(reqPlain) },

@@ -126,6 +126,12 @@ input.mono { font-family: var(--mono); font-size: 13px; }
 .composer.drag { border-color: var(--accent-line); box-shadow: var(--glow); }
 .bubble .att-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .bubble .att-row img { max-width: 160px; max-height: 120px; border-radius: 6px; border: 1px solid var(--line); }
+.att-row .clickable { cursor: zoom-in; }
+.att-row .att.clickable:not(.att-image) { cursor: pointer; }
+.att-image { padding: 10px 12px; }
+.lightbox { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.82); cursor: zoom-out; }
+.lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 8px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6); }
+.lightbox-wait { font: 13px var(--mono); color: var(--muted); }
 .md { white-space: normal; }
 .md p { margin: 0 0 8px; white-space: pre-wrap; }
 .md p:last-child { margin-bottom: 0; }

@@ -6,7 +6,9 @@ import hmac
 import http.client
 import ipaddress
 import json
+import mimetypes
 import os
+import posixpath
 import re
 import secrets
 import selectors
@@ -59,6 +61,8 @@ AGENT_KEY = os.environ.get("AGENT_KEY", "").strip()
 AGENT_UPLOAD_DIR = os.environ.get("AGENT_UPLOAD_DIR", "")
 AGENT_UPLOAD_PATH = os.environ.get("AGENT_UPLOAD_PATH", "/opt/data/uploads")
 AGENT_STATE_DIR = os.environ.get("AGENT_STATE_DIR", "")
+AGENT_DATA_DIR = os.environ.get("AGENT_DATA_DIR", "")
+AGENT_DATA_PATH = os.environ.get("AGENT_DATA_PATH", "/opt/data").rstrip("/")
 AGENT_PROVIDER = os.environ.get("AGENT_PROVIDER", "tee")
 MAX_FILE = 20 << 20
 
@@ -281,7 +285,8 @@ class Workload:
         resp_nonce = os.urandom(12)
         ct = AESGCM(key).encrypt(resp_nonce, resp_plain,
                                  b"pa-mvp/resp/v1|" + self.digest.encode() + b"|" + req_nonce)
-        return {"nonce": resp_nonce.hex(), "ciphertext": ct.hex(),
+        body = {"ciphertext_b64": base64.b64encode(ct).decode()} if "ciphertext_b64" in req else {"ciphertext": ct.hex()}
+        return {"nonce": resp_nonce.hex(), **body,
                 "receipt_sealed": self.seal_receipt(key, req_nonce, self.receipt(plaintext, resp_plain))}
 
     def chat_stream(self, req: dict, send, opened=None):
@@ -1546,6 +1551,12 @@ def delete_chat(sid: str, why: str = "deleted"):
     with CHATS_LOCK:
         lock = CHAT_LOCKS.get(sid)
         need(not (lock and lock.locked()), "这个会话正在运行，等这一轮结束再删")
+        try:
+            rows = agent_json("GET", f"/api/sessions/{urllib.parse.quote(sid)}/messages?inline_images=false")
+            paths = [f["path"] for m in rows.get("messages") or rows.get("data") or [] if m.get("role") == "user"
+                     for f in split_attachments(text_of(m.get("content")))[1]]
+        except Exception:
+            paths = []
         conn, r = agent_http("DELETE", f"/api/sessions/{urllib.parse.quote(sid)}")
         try:
             r.read()
@@ -1554,6 +1565,10 @@ def delete_chat(sid: str, why: str = "deleted"):
         need(r.status in (200, 204, 404), f"agent 删除会话失败：HTTP {r.status}")
         save_registry([c for c in chat_registry() if c["id"] != sid])
         CHAT_LOCKS.pop(sid, None)
+        for p in paths:
+            t = thumb_path(p)
+            if t and os.path.exists(t):
+                os.remove(t)
 
 
 def prune_old(meta: dict):
@@ -1646,6 +1661,8 @@ def agent_request(inner: dict) -> dict:
             return {"ok": True, "stopped": stop_chat(chat_id(inner))}
         if op == "steer":
             return steer_chat(chat_id(inner), str(inner.get("text") or ""))
+        if op == "file":
+            return read_agent_file(str(inner.get("path") or ""))
         if op != "history":
             return {"error": "未知操作"}
         sid = chat_id(inner)
@@ -1659,10 +1676,98 @@ def agent_request(inner: dict) -> dict:
             continue
         steer = m.get("display_kind") == "steer"
         text = text_of(m.get("content"))
-        out.append({"role": m["role"], "content": (STEER_WRAP.sub("", text).strip() if steer else text)[:20000],
+        files = []
+        if steer:
+            text = STEER_WRAP.sub("", text).strip()
+        elif m["role"] == "user":
+            text, files = split_attachments(text)
+        out.append({"role": m["role"], "content": text[:20000],
                     "timestamp": m.get("timestamp"), "tool_calls": [tool_call_of(tc) for tc in m.get("tool_calls") or []],
-                    "tool_name": m.get("tool_name") or m.get("name"), **({"steer": True} if steer else {})})
+                    "tool_name": m.get("tool_name") or m.get("name"), **({"steer": True} if steer else {}),
+                    **({"attachments": files} if files else {})})
     return {"ok": True, "session": sid, "messages": out[-400:], "chats": chats, "internet": internet_on(), "retention_days": RETENTION_DAYS}
+
+
+IMAGE_HINT = re.compile(r"\n*\[Image attached at: ([^\n\]]+)\]")
+UPLOAD_NOTE = re.compile(r"\n*\[附件\] (.+?)（(\d+) 字节）已保存到 (\S+?)，需要时用文件工具读取。")
+SCREENSHOT = re.compile(r"\n*\[screenshot(?: detail=\w+)?\]")
+IMAGE_EXT = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp")
+
+
+def split_attachments(text: str) -> tuple:
+    files = [{"path": p.strip(), "name": os.path.basename(p.strip()), "image": True} for p in IMAGE_HINT.findall(text)]
+    files += [{"path": p, "name": n, "size": int(b), "image": n.lower().endswith(IMAGE_EXT)} for n, b, p in UPLOAD_NOTE.findall(text)]
+    for f in files:
+        meta = load_thumb(f["path"])
+        if meta:
+            f.update(name=meta.get("name") or f["name"], thumb=meta.get("thumb"))
+    text = SCREENSHOT.sub("", UPLOAD_NOTE.sub("", IMAGE_HINT.sub("", text))).strip()
+    return text, files
+
+
+def thumb_bytes(value) -> bytes | None:
+    if not isinstance(value, str) or not value.startswith("data:image/jpeg;base64,"):
+        return None
+    try:
+        raw = base64.b64decode(value.split(",", 1)[1], validate=True)
+    except ValueError:
+        return None
+    return raw if len(raw) <= 96 << 10 and raw[:3] == b"\xff\xd8\xff" else None
+
+
+def thumb_path(agent_path: str) -> str | None:
+    if not AGENT_STATE_DIR:
+        return None
+    return os.path.join(AGENT_STATE_DIR, "thumbs", hashlib.sha256(agent_path.encode()).hexdigest() + ".json")
+
+
+def save_thumb(agent_path: str, name: str, thumb: bytes | None):
+    path = thumb_path(agent_path)
+    if not path or not thumb:
+        return
+    os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+    with open(path + ".tmp", "w") as f:
+        json.dump({"name": name[:200], "thumb": "data:image/jpeg;base64," + base64.b64encode(thumb).decode()}, f)
+    os.replace(path + ".tmp", path)
+
+
+def load_thumb(agent_path: str) -> dict | None:
+    path = thumb_path(agent_path)
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, TypeError, ValueError):
+        return None
+
+
+def attach_thumbs(sid: str, pending: list, since: float):
+    try:
+        msgs = agent_json("GET", f"/api/sessions/{urllib.parse.quote(sid)}/messages?inline_images=false")
+    except Exception:
+        return
+    rows = msgs.get("messages") or msgs.get("data") or []
+    for m in reversed(rows):
+        if m.get("role") == "user" and m.get("display_kind") != "steer":
+            hints = IMAGE_HINT.findall(text_of(m.get("content")))
+            if len(hints) == len(pending) and float(m.get("timestamp") or 0) >= since - 5:
+                for p, (name, thumb) in zip(hints, pending):
+                    save_thumb(p.strip(), name, thumb)
+            return
+
+
+def read_agent_file(path: str) -> dict:
+    need(AGENT_DATA_DIR, "没有配置 agent 数据目录")
+    norm = posixpath.normpath(path)
+    allowed = (f"{AGENT_DATA_PATH}/cache/documents/native-inputs/", AGENT_UPLOAD_PATH.rstrip("/") + "/")
+    need(norm == path and norm.startswith(allowed), "只能读取对话里上传的文件")
+    root = os.path.realpath(AGENT_DATA_DIR)
+    local = os.path.realpath(os.path.join(root, norm[len(AGENT_DATA_PATH) + 1:]))
+    need(local.startswith(root + os.sep) and os.path.isfile(local), "文件不存在")
+    need(os.path.getsize(local) <= MAX_FILE, "文件太大")
+    with open(local, "rb") as f:
+        data = f.read()
+    kind = mimetypes.guess_type(local)[0] or "application/octet-stream"
+    return {"ok": True, "name": os.path.basename(local), "type": kind, "data": base64.b64encode(data).decode()}
 
 
 def save_upload(name: str, data: bytes) -> str:
@@ -1698,17 +1803,21 @@ def agent_turn(inner: dict, emit):
     nonce = inner.get("gateway_nonce")
     need(isinstance(nonce, str) and HEX64.fullmatch(nonce), "缺少本次随机数")
     text = str(inner.get("input") or "")
-    parts, notes, names = [], [], []
+    parts, notes, names, pending_thumbs = [], [], [], []
     for a in (inner.get("attachments") or [])[:8]:
         data = base64.b64decode(a.get("data") or "")
         need(len(data) <= MAX_FILE, f"{a.get('name')} 超过 {MAX_FILE >> 20} MB")
         kind = str(a.get("type") or "application/octet-stream")
         names.append({"name": a.get("name"), "type": kind, "bytes": len(data)})
+        thumb = thumb_bytes(a.get("thumb"))
         if kind.startswith("image/") and model in VISION:
             parts.append({"type": "image_url", "image_url": {"url": f"data:{kind};base64,{base64.b64encode(data).decode()}"}})
+            pending_thumbs.append((str(a.get("name") or "image"), thumb))
         else:
             need(AGENT_UPLOAD_DIR, "没有配置附件目录")
-            notes.append(f"[附件] {a.get('name')}（{len(data)} 字节）已保存到 {save_upload(str(a.get('name') or 'file'), data)}，需要时用文件工具读取。")
+            saved = save_upload(str(a.get('name') or 'file'), data)
+            notes.append(f"[附件] {a.get('name')}（{len(data)} 字节）已保存到 {saved}，需要时用文件工具读取。")
+            save_thumb(saved, str(a.get("name") or "file"), thumb)
     content = "\n".join([text, *notes]).strip()
     need(content or parts, "消息是空的")
     payload = [{"type": "text", "text": content}, *parts] if parts else content
@@ -1720,6 +1829,7 @@ def agent_turn(inner: dict, emit):
         lock = CHAT_LOCKS.setdefault(sid, threading.Lock())
         CHAT_TURNS.setdefault(sid, []).append(turn)
     internet = internet_on()
+    started = time.time()
     try:
         if not wait_turn(turn, lock, emit):
             emit({"type": "run.cancelled", "chat": sid})
@@ -1765,6 +1875,8 @@ def agent_turn(inner: dict, emit):
                 TURNS.pop(token, None)
                 lock.release()
                 cut_tunnels(lambda t: not any(k in TURNS for k in t["tokens"]))
+                if any(t for _, t in pending_thumbs):
+                    attach_thumbs(sid, pending_thumbs, started)
     finally:
         with CHATS_LOCK:
             left = [t for t in CHAT_TURNS.get(sid, []) if t is not turn]

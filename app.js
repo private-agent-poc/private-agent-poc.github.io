@@ -3,7 +3,7 @@ import * as V from "./verify.js";
 const PCCS_URL = "https://pccs.phala.network";
 const APPROVED = [
   { app_id: "c3fd4ff7f667603320296795348aa605e214d51b",
-    compose_hash: "ed3acacdfb0c428abd8ebd58c7fc8ad3e8b06e54653809996c63166c83a8e58a",
+    compose_hash: "21b6273ff49f92f6e9be3c9b0ff623ccc87209ff7a51d1cbfb3c65dc0da2dd47",
     note: "pa-attest-mvp · 带 hermes · 2026-11-04" },
 ];
 const COLLATERAL_NOTE = "CVM 转交 · Intel 签名 · 浏览器本地验签";
@@ -243,7 +243,7 @@ async function saveRecord(rec) {
     if (!d) return;
     const head = {};
     for (const k of HEAD) head[k] = rec[k];
-    head.attachments = (rec.attachments || []).map(({ name, type, size }) => ({ name, type, size }));
+    head.attachments = (rec.attachments || []).map(({ name, type, size, thumb, path, image }) => ({ name, type, size, thumb, path, image }));
     head.stages = { ...rec.stages, tamper: rec.stages.tamper === "running" ? "idle" : rec.stages.tamper };
     const { session = null, agent = null, ...ctx } = rec.context || {};
     head.context = { session, agent };
@@ -796,14 +796,81 @@ function md(text) {
 function attRow(atts) {
   const row = el("div", "att-row");
   for (const a of atts) {
-    if (a.url && a.type.startsWith("image/")) {
-      const img = el("img");
-      img.src = a.url;
-      img.alt = a.name;
-      row.append(img);
-    } else row.append(el("span", "att", `${a.name} · ${fmtSize(a.size)}`));
+    const image = a.image ?? String(a.type || "").startsWith("image/");
+    const src = a.url || a.thumb;
+    let node;
+    if (image && src) {
+      node = el("img");
+      node.src = src;
+      node.alt = a.name;
+    } else if (image) node = el("span", "att att-image", "图片 · 点击查看");
+    else node = el("span", "att", a.size ? `${a.name} · ${fmtSize(a.size)}` : a.name);
+    if (a.url || a.path) {
+      node.classList.add("clickable");
+      node.title = image ? "查看原图" : "下载";
+      node.addEventListener("click", (e) => { e.stopPropagation(); openAttachment(a, image); });
+    }
+    row.append(node);
   }
   return row;
+}
+
+const fullFiles = new Map();
+
+async function openAttachment(a, image) {
+  let url = a.url || fullFiles.get(a.path);
+  if (!url) {
+    if (!state.session) return;
+    const box = image ? lightbox(null, a.name) : null;
+    try {
+      const { out } = await V.chat(state.base, state.session.res, { agent: "file", path: a.path }, state.token,
+                                   { sessionId: state.sessionId, knownNonces: state.nonces, b64: true });
+      if (!out || !out.ok) throw new Error((out && out.error) || "没有返回");
+      url = URL.createObjectURL(new Blob([V.b64ToBytes(out.data)], { type: out.type }));
+      fullFiles.set(a.path, url);
+    } catch (e) {
+      if (box) box.remove();
+      flash(`打开失败：${errText(e)}`);
+      return;
+    }
+    if (box) { box.remove(); lightbox(url, a.name); return; }
+  }
+  if (image) lightbox(url, a.name);
+  else {
+    const link = el("a");
+    link.href = url;
+    link.download = a.name;
+    document.body.append(link);
+    link.click();
+    link.remove();
+  }
+}
+
+function lightbox(url, name) {
+  const box = el("div", "lightbox");
+  box.append(url ? Object.assign(el("img"), { src: url, alt: name }) : el("span", "lightbox-wait", "加载原图…"));
+  const close = () => { box.remove(); document.removeEventListener("keydown", esc); };
+  const esc = (e) => { if (e.key === "Escape") close(); };
+  box.addEventListener("click", close);
+  document.addEventListener("keydown", esc);
+  document.body.append(box);
+  return box;
+}
+
+async function thumbOf(file) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, 320 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(bmp.width * k));
+    c.height = Math.max(1, Math.round(bmp.height * k));
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    for (const q of [0.75, 0.55, 0.35]) {
+      const url = c.toDataURL("image/jpeg", q);
+      if (url.length < 120000) return url;
+    }
+  } catch {}
+  return null;
 }
 
 const fmtSize = (n) => (n >= 1 << 20 ? `${(n / 1048576).toFixed(1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n} B`);
@@ -969,8 +1036,9 @@ async function readFiles(files) {
     if (state.atts.length >= 8) break;
     if (f.size > 20 * 1048576) { flash(`${f.name} 超过 20 MB`); continue; }
     const bytes = new Uint8Array(await f.arrayBuffer());
+    const image = (f.type || "").startsWith("image/");
     state.atts.push({ name: f.name || "file", type: f.type || "application/octet-stream", size: f.size, data: V.bytesToB64(bytes),
-                      url: (f.type || "").startsWith("image/") ? URL.createObjectURL(f) : null });
+                      url: image ? URL.createObjectURL(f) : null, thumb: image ? await thumbOf(f) : null });
   }
   renderAtts();
 }
@@ -1039,7 +1107,7 @@ function historyTurns(msgs) {
       continue;
     }
     if (m.role === "user") {
-      turns.push({ role: "user", text: m.content, time, ms });
+      turns.push({ role: "user", text: m.content, time, ms, atts: m.attachments || [] });
       agent = null;
       continue;
     }
@@ -1079,6 +1147,7 @@ function addHistory(msgs, mark, chat) {
       const r = matchRestored(pool, t);
       if (r) {
         before(r.time - 1);
+        if (t.atts && t.atts.length) r.attachments = t.atts;
         place(r);
         if (turns[i + 1] && turns[i + 1].role === "agent") i++;
         continue;
@@ -1087,7 +1156,10 @@ function addHistory(msgs, mark, chat) {
     }
     const li = el("li", "turn history");
     const b = el("div", t.role === "user" ? "bubble user" : "bubble agent");
-    if (t.role === "user") b.append(md(t.text));
+    if (t.role === "user") {
+      if (t.text) b.append(md(t.text));
+      if (t.atts && t.atts.length) b.append(attRow(t.atts));
+    }
     else for (const it of t.items) b.append(it.kind === "text" ? md(it.text) : it.kind === "steer" ? steerNote(it) : toolCard(it));
     const meta = el("div", "bubble-meta");
     meta.append(el("span", null, t.time));
@@ -1139,7 +1211,7 @@ async function onSendAgent(text, simulate, chat) {
   const m = currentModel();
   const rec = newRecord("message", text || "（附件）");
   Object.assign(rec, { simulated: simulate, provider: state.provider, model: m ? m.id : null, agent: true, internet: $("#internet").checked, chat,
-                       stream: { items: [] }, attachments: atts.map(({ name, type, size, url }) => ({ name, type, size, url })) });
+                       stream: { items: [] }, attachments: atts.map(({ name, type, size, url, thumb }) => ({ name, type, size, url, thumb })) });
   addTurn(rec);
   select(rec.id);
   const source = simulate ? V.concat(state.source, "\n# demo: one extra local line\n") : state.source;
@@ -1149,7 +1221,8 @@ async function onSendAgent(text, simulate, chat) {
       quoteVerifier: state.quoteVerifier, cvmQuoteVerifier: state.cvmVerifier, token: state.token, expectSource: source,
       approved: state.local ? null : APPROVED,
       session: reuse ? state.session : null, sessionId: state.sessionId, knownNonces: state.nonces, reverify: !reuse || state.reverifyNext,
-      provider: rec.provider, model: rec.model, input: text, attachments: atts.map(({ name, type, data }) => ({ name, type, data })),
+      provider: rec.provider, model: rec.model, input: text,
+      attachments: atts.map(({ name, type, data, thumb }) => ({ name, type, data, ...(thumb ? { thumb } : {}) })),
       chat,
     })) {
       if (kind === "agent") {
