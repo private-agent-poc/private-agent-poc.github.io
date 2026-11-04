@@ -3,7 +3,7 @@ import * as V from "./verify.js";
 const PCCS_URL = "https://pccs.phala.network";
 const APPROVED = [
   { app_id: "c3fd4ff7f667603320296795348aa605e214d51b",
-    compose_hash: "7b658b978c15da831c7242adc827a83f344a8241deed925b1353ca789c06528d",
+    compose_hash: "ed3acacdfb0c428abd8ebd58c7fc8ad3e8b06e54653809996c63166c83a8e58a",
     note: "pa-attest-mvp · 带 hermes · 2026-11-04" },
 ];
 const COLLATERAL_NOTE = "CVM 转交 · Intel 签名 · 浏览器本地验签";
@@ -522,11 +522,66 @@ function renderTabs() {
 
 function updateComposer() {
   const c = state.agent ? chatOf(state.chat) : null;
-  const stop = Boolean(c && c.busy && !$("#msg").value.trim());
+  const busy = Boolean(c && c.busy);
+  const stop = busy && !$("#msg").value.trim();
   const btn = $("#send-btn");
   btn.disabled = state.busy || Boolean(stop && c.stopping);
-  btn.textContent = stop ? (c.stopping ? "停止中" : "停止") : "发送";
+  btn.textContent = stop ? (c.stopping ? "停止中" : "停止") : busy ? "补充" : "发送";
+  btn.title = busy && !stop ? "补充给正在进行的这一轮，agent 下一步会看到（回车）" : "";
   btn.classList.toggle("stop", stop);
+  $("#interrupt-btn").hidden = !busy || stop;
+  $("#interrupt-btn").disabled = Boolean(c && c.stopping);
+}
+
+function interruptSend() {
+  const c = state.agent ? chatOf(state.chat) : null;
+  const text = $("#msg").value.trim();
+  if (!c || !c.busy || !text) return;
+  $("#msg").value = "";
+  runChat(state.chat, { text, simulate: $("#simulate").checked });
+  stopChat(state.chat);
+  updateComposer();
+}
+
+async function runChat(chat, next) {
+  const c = chatOf(chat);
+  if (c.busy) {
+    c.next = c.next ? { ...c.next, text: `${c.next.text}\n${next.text}` } : next;
+    return;
+  }
+  c.busy = true;
+  updateComposer();
+  renderTabs();
+  try {
+    while (next) {
+      await onSendAgent(next.text, next.simulate, chat);
+      next = c.next;
+      c.next = null;
+    }
+  } finally {
+    c.busy = false;
+    updateComposer();
+    renderTabs();
+    if (chat === state.chat) $("#msg").focus();
+  }
+}
+
+async function steerChat(chat, text) {
+  const rec = [...state.records].reverse().find((r) => r.chat === chat && r.agent && r.status === "running");
+  const item = { kind: "steer", text, state: "sending" };
+  if (rec) { rec.stream.items.push(item); paintSoon(rec); }
+  let sent = false;
+  try {
+    const { checks, out } = await V.chat(state.base, state.session.res, { agent: "steer", chat, text }, state.token,
+                                         { sessionId: state.sessionId, knownNonces: state.nonces });
+    if ((checks || []).some((c) => c.status === "FAIL")) item.unverified = true;
+    sent = Boolean(out && out.ok);
+  } catch (e) {
+    item.error = errText(e);
+  }
+  item.state = sent ? "sent" : "later";
+  if (!sent) runChat(chat, { text, simulate: false });
+  if (rec) paintSoon(rec);
 }
 
 async function stopChat(chat) {
@@ -767,6 +822,16 @@ function thinkBlock(it) {
   return d;
 }
 
+const STEER_STATE = { sending: "发送中", later: "这一轮结束后作为新消息发送", lost: "没送到" };
+
+function steerNote(it) {
+  const d = el("div", "steer");
+  d.append(el("span", "steer-mark", "补充"), el("span", null, it.text));
+  const tag = it.unverified ? "回执未通过验证" : STEER_STATE[it.state];
+  if (tag) d.append(el("span", "steer-state", tag));
+  return d;
+}
+
 function toolCard(it) {
   const d = keepOpen(el("details", "tool-card"), it, false);
   const s = el("summary");
@@ -793,6 +858,10 @@ function renderAgentBubble(a, rec) {
   a.classList.remove("error");
   const items = ((rec.stream && rec.stream.items) || []).filter((it) => !(rec.stopped && it.kind === "text" && INTERRUPTED.test(it.text)));
   for (const it of items) {
+    if (it.kind === "steer") {
+      a.append(steerNote(it));
+      continue;
+    }
     if (it.kind !== "text") {
       a.append(it.kind === "think" ? thinkBlock(it) : toolCard(it));
       continue;
@@ -878,6 +947,11 @@ function onAgentEvent(rec, ev) {
     s.call = { n: ev.n, model: ev.model, running: false, error: ev.ok ? null : ev.error };
     if (!ev.ok) s.failures = (s.failures || 0) + 1;
   } else if (ev.type === "run.cancelled") rec.stopped = true;
+  if (ev.pending_steer && !rec.replayed && (ev.type === "run.completed" || ev.type === "run.cancelled" || ev.type === "run.failed")) {
+    rec.replayed = true;
+    for (const it of s.items) if (it.kind === "steer" && it.state === "sent") it.state = "later";
+    runChat(rec.chat, { text: String(ev.pending_steer), simulate: false });
+  }
   else if (ev.type === "run.failed" || ev.type === "error") rec.serviceError = ev.error || ev.type;
 }
 
@@ -960,6 +1034,10 @@ function historyTurns(msgs) {
   for (const m of msgs) {
     const ms = m.timestamp ? m.timestamp * 1000 : null;
     const time = ms ? clock(ms) : "";
+    if (m.role === "user" && m.steer && agent) {
+      agent.items.push({ kind: "steer", text: m.content });
+      continue;
+    }
     if (m.role === "user") {
       turns.push({ role: "user", text: m.content, time, ms });
       agent = null;
@@ -1010,7 +1088,7 @@ function addHistory(msgs, mark, chat) {
     const li = el("li", "turn history");
     const b = el("div", t.role === "user" ? "bubble user" : "bubble agent");
     if (t.role === "user") b.append(md(t.text));
-    else for (const it of t.items) b.append(it.kind === "text" ? md(it.text) : toolCard(it));
+    else for (const it of t.items) b.append(it.kind === "text" ? md(it.text) : it.kind === "steer" ? steerNote(it) : toolCard(it));
     const meta = el("div", "bubble-meta");
     meta.append(el("span", null, t.time));
     b.append(meta);
@@ -1110,37 +1188,17 @@ async function onSend(ev) {
   const text = $("#msg").value.trim();
   const simulate = $("#simulate").checked;
   if (state.agent && chatOf(state.chat).busy) {
-    const chat = state.chat;
-    const c = chatOf(chat);
-    if (text || state.atts.length) {
-      c.next = { text, simulate };
+    if (text) {
       $("#msg").value = "";
-      flash("先停下当前这一轮，停下后马上发送");
-    } else if (ev.submitter !== $("#send-btn")) return;
-    stopChat(chat);
+      updateComposer();
+      steerChat(state.chat, text);
+    } else if (ev.submitter === $("#send-btn")) stopChat(state.chat);
     return;
   }
   if ((!text && !(state.agent && state.atts.length)) || state.busy) return;
   if (state.agent) {
-    const chat = state.chat;
-    const c = chatOf(chat);
     $("#msg").value = "";
-    c.busy = true;
-    updateComposer();
-    renderTabs();
-    try {
-      let next = { text, simulate };
-      while (next) {
-        await onSendAgent(next.text, next.simulate, chat);
-        next = c.next;
-        c.next = null;
-      }
-    } finally {
-      c.busy = false;
-      updateComposer();
-      renderTabs();
-      if (chat === state.chat) $("#msg").focus();
-    }
+    await runChat(state.chat, { text, simulate });
     return;
   }
   state.busy = true;
@@ -2242,8 +2300,12 @@ for (const t of ["dragover", "dragleave", "drop"]) {
 }
 setInterval(pollHistory, 15000);
 $("#msg").addEventListener("input", updateComposer);
+$("#interrupt-btn").addEventListener("click", interruptSend);
 $("#msg").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#composer").requestSubmit(); }
+  if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
+  e.preventDefault();
+  if ((e.metaKey || e.ctrlKey) && state.agent && chatOf(state.chat).busy) interruptSend();
+  else $("#composer").requestSubmit();
 });
 (["#cvm-url", "#access-key"].map((q) => $(q)).find((x) => !x.value) || $("#login-btn")).focus();
 if (resume && resume.base === $("#cvm-url").value && $("#access-key").value) $("#login-form").requestSubmit();

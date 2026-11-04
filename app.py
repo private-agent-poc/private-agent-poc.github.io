@@ -1644,6 +1644,8 @@ def agent_request(inner: dict) -> dict:
             return {"ok": True, "chats": list_chats()}
         if op == "stop":
             return {"ok": True, "stopped": stop_chat(chat_id(inner))}
+        if op == "steer":
+            return steer_chat(chat_id(inner), str(inner.get("text") or ""))
         if op != "history":
             return {"error": "未知操作"}
         sid = chat_id(inner)
@@ -1653,11 +1655,13 @@ def agent_request(inner: dict) -> dict:
         return {"error": scrub(f"{type(e).__name__}: {e}")}
     out = []
     for m in data.get("messages") or data.get("data") or []:
-        if m.get("role") not in ("user", "assistant", "tool"):
+        if m.get("role") not in ("user", "assistant", "tool") or m.get("display_kind") == "hidden":
             continue
-        out.append({"role": m["role"], "content": text_of(m.get("content"))[:20000], "timestamp": m.get("timestamp"),
-                    "tool_calls": [tool_call_of(tc) for tc in m.get("tool_calls") or []],
-                    "tool_name": m.get("tool_name") or m.get("name")})
+        steer = m.get("display_kind") == "steer"
+        text = text_of(m.get("content"))
+        out.append({"role": m["role"], "content": (STEER_WRAP.sub("", text).strip() if steer else text)[:20000],
+                    "timestamp": m.get("timestamp"), "tool_calls": [tool_call_of(tc) for tc in m.get("tool_calls") or []],
+                    "tool_name": m.get("tool_name") or m.get("name"), **({"steer": True} if steer else {})})
     return {"ok": True, "session": sid, "messages": out[-400:], "chats": chats, "internet": internet_on(), "retention_days": RETENTION_DAYS}
 
 
@@ -1749,7 +1753,7 @@ def agent_turn(inner: dict, emit):
                                     stop_turn(turn)
                             emit({"type": event, **{k: data[k] for k in ("delta", "content", "text", "tool", "name", "tool_name", "args",
                                                                           "arguments", "result", "preview", "error", "usage", "message_id",
-                                                                          "already_streamed") if k in data}})
+                                                                          "already_streamed", "pending_steer") if k in data}})
                             if event in ("run.completed", "run.failed", "run.cancelled"):
                                 break
                         elif not line:
@@ -1798,6 +1802,24 @@ def stop_turn(turn: dict):
             conn.close()
         except Exception:
             pass
+
+
+STEER_WRAP = re.compile(r"\[OUT-OF-BAND USER MESSAGE[^\]]*\]|\[/OUT-OF-BAND USER MESSAGE\]")
+
+
+def steer_chat(sid: str, text: str) -> dict:
+    need(text.strip(), "补充的内容是空的")
+    need(len(text) <= 20000, "补充的内容太长")
+    with CHATS_LOCK:
+        running = [t for t in CHAT_TURNS.get(sid, []) if t.get("active") and t.get("run_id") and not t.get("stopped")]
+    if not running:
+        return {"ok": False, "error": "not_running"}
+    conn, r = agent_http("POST", f"/v1/runs/{urllib.parse.quote(running[0]['run_id'], safe='')}/steer", {"input": text.strip()})
+    try:
+        r.read()
+    finally:
+        conn.close()
+    return {"ok": True} if r.status == 200 else {"ok": False, "error": "not_running"}
 
 
 def stop_chat(sid: str) -> int:
